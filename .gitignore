@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+
+# Builds
+dist/
+build/
+dev-dist/
+*.tsbuildinfo
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Local database (PGlite dev data)
+server/.data/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# AI assistant / agent tooling
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+.planning/
+graphify-out/
+.impeccable*
+
+# Netlify / Render local state
+.netlify/
