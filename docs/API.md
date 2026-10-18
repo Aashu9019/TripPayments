@@ -24,6 +24,22 @@ normalised to `+<country><number>`; bare 10-digit Nepali mobiles get +977.
 | POST | `/trips/:code/places` | leader | `kind (stop/stay/contact), title, phone, address, day, note` |
 | PUT/DELETE | `/trips/:code/places/:id` | leader | |
 
+Admin (signed in as the `ADMIN_PHONE` account):
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/admin/stats` | platform totals |
+| GET | `/admin/trips?q=` | trips with leader, people, entries, total, last activity |
+| GET | `/admin/trips/:code` | members with balances, latest 50 entries |
+| DELETE | `/admin/trips/:code` | deletes trip and everything in it |
+| GET | `/admin/users?q=` | people with trip counts and last sign-in |
+| DELETE | `/admin/users/:id` | deletes account; trip seats stay, unclaimed |
+| DELETE | `/admin/users/:id/sessions` | signs the person out everywhere |
+
+Removing a member (`DELETE /trips/:code/members/:id`, leader) deletes the seat
+if it has no payments; otherwise the seat is kept for the ledger, marked left,
+and unlinked from the account.
+
 Entry body:
 - expense: `kind:"expense", title, category, amount, fromId (null = common fund), splitMode:"equal", participants[]` or `splitMode:"exact", shares:{memberId: paisa}`
 - deposit: `kind:"deposit", amount, fromId`

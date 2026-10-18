@@ -78,6 +78,7 @@ export interface User {
   id: string;
   phone: string;
   name: string;
+  isAdmin?: boolean;
 }
 
 /** A trip in the signed-in user's list, with their own balance. */
@@ -92,4 +93,48 @@ export interface MyTrip {
   people: number;
   total: number;
   net: number;
+}
+
+export interface AdminStats {
+  users: number;
+  users_week: number;
+  trips: number;
+  trips_week: number;
+  entries: number;
+  spent: number;
+  active_trips: number;
+}
+
+export interface AdminTrip {
+  code: string;
+  name: string;
+  destination: string;
+  start_date: string | null;
+  end_date: string | null;
+  currency: string;
+  created_at: string;
+  leader: string | null;
+  leader_phone: string | null;
+  people: number;
+  entries: number;
+  total: number;
+  last_activity: string | null;
+}
+
+export interface AdminTripDetail {
+  trip: { code: string; name: string; destination: string; currency: string; created_at: string };
+  members: { id: string; name: string; role: Role; left_at: string | null; account_phone: string | null; spent: number; net: number }[];
+  entries: { id: string; kind: EntryKind; title: string; amount: number; date: string }[];
+  total: number;
+  fund: { in: number; out: number; cash: number };
+}
+
+export interface AdminUser {
+  id: string;
+  name: string;
+  phone: string;
+  created_at: string;
+  trips: number;
+  leading: number;
+  last_login: string | null;
 }

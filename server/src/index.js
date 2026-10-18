@@ -3,6 +3,7 @@ import cors from 'cors';
 import crypto from 'node:crypto';
 import { connect, query, tx } from './db.js';
 import { computeBalances, equalShares } from './ledger.js';
+import { adminRoutes, ensureAdmin } from './admin.js';
 
 const app = express();
 app.set('trust proxy', 1); // Render sits behind a proxy; needed for per-IP login throttling
@@ -85,7 +86,7 @@ async function currentUser(req) {
   const token = header.startsWith('Bearer ') ? header.slice(7) : '';
   if (!token) return null;
   const { rows } = await query(
-    'SELECT u.id, u.phone, u.name FROM auth_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1',
+    'SELECT u.id, u.phone, u.name, u.is_admin FROM auth_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1',
     [hash(token)],
   );
   return rows[0] ?? null;
@@ -172,7 +173,7 @@ app.post(
       name,
       await hashPassword(password),
     ]);
-    res.status(201).json({ token: await newSession(userId), user: { id: userId, phone, name } });
+    res.status(201).json({ token: await newSession(userId), user: { id: userId, phone, name, isAdmin: false } });
   }),
 );
 
@@ -186,7 +187,7 @@ app.post(
     const { rows } = await query('SELECT * FROM users WHERE phone = $1', [phone]);
     const user = rows[0];
     if (!user || !(await checkPassword(password, user.pass_hash))) throw new HttpError(401, 'Wrong phone number or password');
-    res.json({ token: await newSession(user.id), user: { id: user.id, phone: user.phone, name: user.name } });
+    res.json({ token: await newSession(user.id), user: { id: user.id, phone: user.phone, name: user.name, isAdmin: user.is_admin } });
   }),
 );
 
@@ -202,7 +203,8 @@ app.post(
 app.get(
   '/api/auth/me',
   wrap(async (req, res) => {
-    res.json({ user: await requireUser(req) });
+    const { is_admin, ...user } = await requireUser(req);
+    res.json({ user: { ...user, isAdmin: is_admin } });
   }),
 );
 
@@ -418,10 +420,14 @@ app.delete(
       `SELECT 1 FROM entries WHERE trip_id = $1 AND (from_id = $2 OR to_id = $2 OR shares ? $2) LIMIT 1`,
       [trip.id, req.params.id],
     );
-    if (rows.length) throw new HttpError(409, 'This person has payments on the trip. Mark them as left instead.');
-    await query('DELETE FROM members WHERE id = $1 AND trip_id = $2', [req.params.id, trip.id]);
+    if (rows.length) {
+      // Their payments must stay so balances add up: drop access, keep the ledger seat.
+      await query('UPDATE members SET left_at = now(), user_id = NULL WHERE id = $1 AND trip_id = $2', [req.params.id, trip.id]);
+    } else {
+      await query('DELETE FROM members WHERE id = $1 AND trip_id = $2', [req.params.id, trip.id]);
+    }
     await bump(query, trip.id);
-    res.json({ ok: true });
+    res.json({ ok: true, kept: rows.length > 0 });
   }),
 );
 
@@ -592,6 +598,9 @@ app.delete(
   }),
 );
 
+adminRoutes(app, { query, wrap, requireUser, HttpError, computeBalances });
+
 const port = Number(process.env.PORT) || 8787;
 await connect();
+await ensureAdmin({ query, id, normalizePhone, hashPassword });
 app.listen(port, () => console.log(`SajiloTrip API on :${port}`));

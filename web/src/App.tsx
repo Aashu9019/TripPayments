@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import { RequireAuth } from './lib/auth-context';
+import { RequireAdmin, RequireAuth } from './lib/auth-context';
+import { Admin } from './screens/Admin';
 import { Landing } from './screens/Landing';
 import { Login } from './screens/Login';
 import { CreateTrip } from './screens/CreateTrip';
@@ -13,6 +14,7 @@ export function App() {
   return (
     <Routes location={location} key={top.startsWith('/t/') ? top : location.pathname}>
       <Route path="/login" element={<Login />} />
+      <Route path="/admin" element={<RequireAdmin><Admin /></RequireAdmin>} />
       <Route path="/" element={<RequireAuth><Landing /></RequireAuth>} />
       <Route path="/new" element={<RequireAuth><CreateTrip /></RequireAuth>} />
       <Route path="/join" element={<RequireAuth><JoinTrip /></RequireAuth>} />

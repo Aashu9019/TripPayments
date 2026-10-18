@@ -46,9 +46,17 @@ fewest payments needed to settle everyone.
 - Anyone can start a trip for any group; the creator is that trip's leader
 - Friends join with the invite link or 6-letter code and tap their name
 - Every member's number is one tap away (Call / WhatsApp)
-- The leader can add people, hand over leadership, mark someone as left,
-  or free up a seat
+- The leader can add people, remove people (with confirmation), hand over
+  leadership, or free up a seat. Removed people with payments keep their
+  balance until it is settled
 - Everyone's screen updates within a few seconds of any change
+
+**Superadmin**
+- Sign in on the normal login form with the admin phone + password (set on
+  the server) to open the admin panel
+- Platform numbers: people, trips, active trips, entries, money tracked
+- Search and inspect any trip (members, balances, latest entries) or person
+- Delete trips, delete accounts, sign a person out on all devices
 
 **App**
 - Installable PWA (Android, iPhone, desktop)
@@ -159,6 +167,11 @@ New → Blueprint → select this repo. When prompted, set:
 |---|---|
 | `DATABASE_URL` | Neon connection string |
 | `CORS_ORIGIN` | `*` for now; your Netlify URL once you have it |
+| `ADMIN_PHONE` | phone number for the superadmin login |
+| `ADMIN_PASSWORD` | superadmin password, at least 10 characters |
+
+The admin account is created (or its password updated) from these two
+variables every time the server starts. Never put them in the repo.
 
 Check `https://<your-api>.onrender.com/api/health` returns `{"ok":true}`.
 Free Render services sleep after 15 minutes idle; a cron job hitting

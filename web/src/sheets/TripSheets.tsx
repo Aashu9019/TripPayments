@@ -122,7 +122,7 @@ export function MemberSheet({
   onOpenChange: (o: boolean) => void;
   member?: Member;
 }) {
-  const { mutate, code, me, isLeader } = useLoadedTrip();
+  const { mutate, code, me, isLeader, data } = useLoadedTrip();
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [busy, setBusy] = useState(false);
@@ -190,24 +190,30 @@ export function MemberSheet({
             </button>
           )}
           {member.left_at ? (
-            <button className="btn ghost" disabled={busy} onClick={() => run(() => api.updateMember(code, member.id, { left: false }))}>
+            <button className="btn ghost" disabled={busy} onClick={() => run(() => api.updateMember(code, member.id, { left: false }), `${member.name} is back on the trip`)}>
               Bring back to trip
             </button>
           ) : (
-            <button className="btn ghost" disabled={busy} onClick={() => run(() => api.updateMember(code, member.id, { left: true }), `${member.name} marked as left`)}>
-              Mark as left the trip
+            <button
+              className="btn danger"
+              disabled={busy}
+              onClick={() => {
+                const hasMoney = data.entries.some(
+                  (e) => e.from_id === member.id || e.to_id === member.id || member.id in e.shares,
+                );
+                const msg = hasMoney
+                  ? `Remove ${member.name} from the trip?
+
+They have payments here, so their balance stays in Settle until it is cleared. They will lose access to the trip.`
+                  : `Remove ${member.name} from the trip?
+
+They will lose access to the trip.`;
+                if (confirm(msg)) run(() => api.removeMember(code, member.id), `${member.name} removed`);
+              }}
+            >
+              Remove from trip
             </button>
           )}
-          <button
-            className="btn danger"
-            disabled={busy}
-            onClick={() => confirm(`Remove ${member.name} completely?`) && run(() => api.removeMember(code, member.id), 'Removed')}
-          >
-            Remove from trip
-          </button>
-          <p className="hint" style={{ margin: 0, padding: 0 }}>
-            People who left keep their balance until it is settled. Removing only works if they have no payments.
-          </p>
         </div>
       )}
     </Sheet>

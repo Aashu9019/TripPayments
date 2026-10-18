@@ -21,6 +21,7 @@ export function Landing() {
     launched = true;
   }, []);
 
+  if (user?.isAdmin && !params.has('all')) return <Navigate to="/admin" replace />;
   const last = recent.latest();
   if (!launched && !params.has('all') && last && (!trips || trips.some((t) => t.code === last))) {
     return <Navigate to={`/t/${last}`} replace />;

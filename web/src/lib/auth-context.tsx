@@ -49,6 +49,14 @@ export function useAuth() {
   return v;
 }
 
+/** Admin-only screens. */
+export function RequireAdmin({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login?next=/admin" replace />;
+  if (!user.isAdmin) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
 /** Sends signed-out visitors to sign-in, then back to where they were going. */
 export function RequireAuth({ children }: { children: ReactNode }) {
   const { user } = useAuth();
