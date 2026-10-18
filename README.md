@@ -1,6 +1,6 @@
 # SajiloTrip — trip money, settled
 
-**Live app:** https://your-app.netlify.app <!-- replace with the real Netlify URL -->
+**Live app:** https://sajilotrip.netlify.app
 
 SajiloTrip is a small shared ledger for groups of friends on a trip. Log who paid
 for what, split it in a tap, and always know who owes whom — including the
@@ -59,7 +59,7 @@ fewest payments needed to settle everyone.
 
 ## Using the app
 
-1. Open the [live app](https://your-app.netlify.app), create an account with
+1. Open the [live app](https://sajilotrip.netlify.app), create an account with
    your phone number, and tap **Start a trip**.
 2. Go to the **Trip** tab: add your friends, the route, stays and phone numbers.
 3. Tap the share icon and send the invite link to the group.
