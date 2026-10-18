@@ -11,10 +11,8 @@ Installable PWA, works offline for reading.
 
 ## Local development
 ```bash
-npm install --prefix server
-npm install --prefix web
-npm run dev --prefix server   # http://localhost:8787
-npm run dev --prefix web      # http://localhost:5173 (proxies /api)
+npm run setup   # installs root, server and web packages
+npm run dev     # API on :8787 + web on http://localhost:5173 (proxies /api)
 ```
 
 ## Deploy
