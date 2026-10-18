@@ -14,8 +14,12 @@ const applyTransfers = (net, transfers) => {
   return after;
 };
 
-test('equal shares distribute leftover paisa', () => {
-  assert.deepEqual(equalShares(100, ['a', 'b', 'c']), { a: 34, b: 33, c: 33 });
+test('equal shares keep whole rupees when the total is whole', () => {
+  assert.deepEqual(equalShares(100000, ['a', 'b', 'c']), { a: 33400, b: 33300, c: 33300 });
+});
+
+test('equal shares fall back to paisa for paisa totals', () => {
+  assert.deepEqual(equalShares(1001, ['a', 'b']), { a: 501, b: 500 });
 });
 
 test('fund deposits, fund spending and personal spending settle to zero', () => {

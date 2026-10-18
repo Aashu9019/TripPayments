@@ -3,15 +3,20 @@
 
 export const FUND = 'fund';
 
-/** Split `total` equally across ids; leftover paisa go to the first ids. */
+/**
+ * Split `total` equally across ids. Whole-rupee totals split in whole rupees
+ * (nobody wants to pay Rs 299.83); the leftover units go to the first ids.
+ */
 export function equalShares(total, ids) {
   const n = ids.length;
   if (!n) return {};
-  const base = Math.floor(total / n);
-  let rem = total - base * n;
+  const unit = total % 100 === 0 ? 100 : 1;
+  const units = total / unit;
+  const base = Math.floor(units / n);
+  let rem = units - base * n;
   const out = {};
   for (const id of ids) {
-    out[id] = base + (rem > 0 ? 1 : 0);
+    out[id] = (base + (rem > 0 ? 1 : 0)) * unit;
     if (rem > 0) rem--;
   }
   return out;
