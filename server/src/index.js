@@ -5,6 +5,7 @@ import { connect, query, tx } from './db.js';
 import { computeBalances, equalShares } from './ledger.js';
 
 const app = express();
+app.set('trust proxy', 1); // Render sits behind a proxy; needed for per-IP login throttling
 const origins = (process.env.CORS_ORIGIN ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 app.use(cors({ origin: origins.length ? origins : true }));
 app.use(express.json({ limit: '64kb' }));
@@ -22,6 +23,17 @@ class HttpError extends Error {
   }
 }
 const bad = (msg) => new HttpError(400, msg);
+
+/** "9841234567", "+977-984-1234567" -> "+9779841234567". Nepal is the default country. */
+function normalizePhone(v) {
+  if (typeof v !== 'string') return null;
+  let d = v.replace(/[^\d+]/g, '');
+  const intl = d.startsWith('+');
+  d = d.replace(/\D/g, '');
+  if (!intl && d.length === 10 && d.startsWith('9')) d = `977${d}`;
+  if (d.startsWith('00')) d = d.slice(2);
+  return d.length >= 8 && d.length <= 15 ? `+${d}` : null;
+}
 
 const str = (v, max = 200) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 const date = (v) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
@@ -43,18 +55,71 @@ async function loadTrip(code) {
   return rows[0];
 }
 
-/** Resolves the caller from the x-member-token header. */
-async function auth(req, trip, { leader = false } = {}) {
-  const token = req.get('x-member-token');
-  if (!token) throw new HttpError(401, 'Join the trip first');
-  const { rows } = await query(
-    'SELECT * FROM members WHERE trip_id = $1 AND token_hash = $2 AND left_at IS NULL',
-    [trip.id, hash(token)],
+// ---------- Accounts ----------
+
+const scrypt = (password, salt) =>
+  new Promise((resolve, reject) =>
+    crypto.scrypt(password, salt, 64, (err, key) => (err ? reject(err) : resolve(key.toString('hex')))),
   );
+
+async function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  return `${salt}:${await scrypt(password, salt)}`;
+}
+
+async function checkPassword(password, stored) {
+  const [salt, key] = stored.split(':');
+  const test = await scrypt(password, salt);
+  return crypto.timingSafeEqual(Buffer.from(test, 'hex'), Buffer.from(key, 'hex'));
+}
+
+async function newSession(userId) {
+  const token = crypto.randomBytes(32).toString('base64url');
+  await query('INSERT INTO auth_sessions (token_hash, user_id) VALUES ($1, $2)', [hash(token), userId]);
+  return token;
+}
+
+/** The signed-in user from `Authorization: Bearer <token>`, or null. */
+async function currentUser(req) {
+  const header = req.get('authorization') ?? '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : '';
+  if (!token) return null;
+  const { rows } = await query(
+    'SELECT u.id, u.phone, u.name FROM auth_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1',
+    [hash(token)],
+  );
+  return rows[0] ?? null;
+}
+
+async function requireUser(req) {
+  const user = await currentUser(req);
+  if (!user) throw new HttpError(401, 'Please sign in');
+  return user;
+}
+
+/** The caller's membership in this trip. */
+async function auth(req, trip, { leader = false } = {}) {
+  const user = await requireUser(req);
+  const { rows } = await query('SELECT * FROM members WHERE trip_id = $1 AND user_id = $2 AND left_at IS NULL', [
+    trip.id,
+    user.id,
+  ]);
   const me = rows[0];
-  if (!me) throw new HttpError(401, 'Your session for this trip has ended. Join again.');
+  if (!me) throw new HttpError(403, 'You are not on this trip. Join it first.');
   if (leader && me.role !== 'leader') throw new HttpError(403, 'Only the trip leader can do that');
   return me;
+}
+
+// Small in-memory brake on password guessing: 10 tries per 10 minutes per IP + phone number.
+const attempts = new Map();
+function throttle(key) {
+  const now = Date.now();
+  const a = attempts.get(key);
+  if (!a || now - a.start > 10 * 60_000) {
+    attempts.set(key, { start: now, n: 1 });
+    return;
+  }
+  if (++a.n > 10) throw new HttpError(429, 'Too many tries. Wait a few minutes.');
 }
 
 const bump = (run, tripId) => run('UPDATE trips SET version = version + 1 WHERE id = $1', [tripId]);
@@ -64,10 +129,10 @@ async function nextColor(run, tripId) {
   return rows[0].n % 8;
 }
 
-async function state(trip) {
+async function state(trip, userId = null) {
   const [members, entries, places] = await Promise.all([
     query(
-      `SELECT id, name, role, phone, color, left_at, created_at, (token_hash IS NOT NULL) AS claimed
+      `SELECT id, name, role, phone, color, left_at, created_at, user_id
        FROM members WHERE trip_id = $1 ORDER BY created_at`,
       [trip.id],
     ),
@@ -75,9 +140,11 @@ async function state(trip) {
     query('SELECT * FROM places WHERE trip_id = $1 ORDER BY kind, sort, day NULLS LAST, created_at', [trip.id]),
   ]);
   const { id: _id, ...publicTrip } = trip;
+  const me = userId ? members.rows.find((m) => m.user_id === userId && !m.left_at) : null;
   return {
     trip: publicTrip,
-    members: members.rows,
+    meId: me?.id ?? null,
+    members: members.rows.map(({ user_id, ...m }) => ({ ...m, claimed: user_id !== null })),
     entries: entries.rows,
     places: places.rows,
     ledger: computeBalances(members.rows, entries.rows, trip.fund_keeper_id),
@@ -87,16 +154,101 @@ async function state(trip) {
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
+app.post(
+  '/api/auth/signup',
+  wrap(async (req, res) => {
+    const phone = normalizePhone(req.body.phone);
+    const name = str(req.body.name, 40);
+    const password = typeof req.body.password === 'string' ? req.body.password : '';
+    if (!phone) throw bad('Enter a valid phone number');
+    if (!name) throw bad('Add your name');
+    if (password.length < 6) throw bad('Password needs at least 6 characters');
+    const { rows } = await query('SELECT 1 FROM users WHERE phone = $1', [phone]);
+    if (rows.length) throw new HttpError(409, 'An account with this number exists. Sign in instead.');
+    const userId = id();
+    await query('INSERT INTO users (id, phone, name, pass_hash) VALUES ($1, $2, $3, $4)', [
+      userId,
+      phone,
+      name,
+      await hashPassword(password),
+    ]);
+    res.status(201).json({ token: await newSession(userId), user: { id: userId, phone, name } });
+  }),
+);
+
+app.post(
+  '/api/auth/login',
+  wrap(async (req, res) => {
+    const phone = normalizePhone(req.body.phone);
+    const password = typeof req.body.password === 'string' ? req.body.password : '';
+    if (!phone) throw bad('Enter a valid phone number');
+    throttle(`${req.ip}:${phone}`);
+    const { rows } = await query('SELECT * FROM users WHERE phone = $1', [phone]);
+    const user = rows[0];
+    if (!user || !(await checkPassword(password, user.pass_hash))) throw new HttpError(401, 'Wrong phone number or password');
+    res.json({ token: await newSession(user.id), user: { id: user.id, phone: user.phone, name: user.name } });
+  }),
+);
+
+app.post(
+  '/api/auth/logout',
+  wrap(async (req, res) => {
+    const header = req.get('authorization') ?? '';
+    if (header.startsWith('Bearer ')) await query('DELETE FROM auth_sessions WHERE token_hash = $1', [hash(header.slice(7))]);
+    res.json({ ok: true });
+  }),
+);
+
+app.get(
+  '/api/auth/me',
+  wrap(async (req, res) => {
+    res.json({ user: await requireUser(req) });
+  }),
+);
+
+// Every trip the signed-in user is on, with their balance in each.
+app.get(
+  '/api/me/trips',
+  wrap(async (req, res) => {
+    const user = await requireUser(req);
+    const { rows: trips } = await query(
+      `SELECT t.*, m.id AS member_id, m.role FROM trips t JOIN members m ON m.trip_id = t.id
+       WHERE m.user_id = $1 AND m.left_at IS NULL ORDER BY COALESCE(t.start_date, t.created_at::date) DESC`,
+      [user.id],
+    );
+    const out = await Promise.all(
+      trips.map(async (t) => {
+        const [{ rows: members }, { rows: entries }] = await Promise.all([
+          query('SELECT id FROM members WHERE trip_id = $1', [t.id]),
+          query('SELECT kind, amount, from_id, to_id, shares FROM entries WHERE trip_id = $1', [t.id]),
+        ]);
+        const ledger = computeBalances(members, entries, t.fund_keeper_id);
+        return {
+          code: t.code,
+          name: t.name,
+          destination: t.destination,
+          start_date: t.start_date,
+          end_date: t.end_date,
+          currency: t.currency,
+          role: t.role,
+          people: members.length,
+          total: ledger.total,
+          net: ledger.net[t.member_id] ?? 0,
+        };
+      }),
+    );
+    res.json({ trips: out });
+  }),
+);
+
 // Create a trip; the creator becomes its leader.
 app.post(
   '/api/trips',
   wrap(async (req, res) => {
+    const user = await requireUser(req);
     const name = str(req.body.name, 80);
-    const leaderName = str(req.body.leaderName, 40);
     if (!name) throw bad('Give the trip a name');
-    if (!leaderName) throw bad('Add your name');
-    const token = crypto.randomBytes(24).toString('base64url');
-    const out = await tx(async (run) => {
+    const code = await tx(async (run) => {
       const tripId = id();
       const memberId = id();
       let code;
@@ -112,12 +264,12 @@ app.post(
           str(req.body.currency, 3).toUpperCase() || 'NPR', memberId],
       );
       await run(
-        `INSERT INTO members (id, trip_id, name, role, color, token_hash) VALUES ($1, $2, $3, 'leader', 0, $4)`,
-        [memberId, tripId, leaderName, hash(token)],
+        `INSERT INTO members (id, trip_id, name, role, color, user_id, phone) VALUES ($1, $2, $3, 'leader', 0, $4, $5)`,
+        [memberId, tripId, user.name, user.id, user.phone],
       );
-      return { code, memberId };
+      return code;
     });
-    res.status(201).json({ ...out, token });
+    res.status(201).json({ code });
   }),
 );
 
@@ -127,38 +279,47 @@ app.get(
   wrap(async (req, res) => {
     const trip = await loadTrip(req.params.code);
     if (req.query.v && Number(req.query.v) === trip.version) return res.json({ unchanged: true });
-    res.json(await state(trip));
+    const user = await currentUser(req);
+    res.json(await state(trip, user?.id));
   }),
 );
 
-// Join: claim an existing unclaimed member, or add yourself by name.
+// Join: claim a seat the leader added, or add yourself. Safe to call again.
 app.post(
   '/api/trips/:code/join',
   wrap(async (req, res) => {
     const trip = await loadTrip(req.params.code);
-    const token = crypto.randomBytes(24).toString('base64url');
+    const user = await requireUser(req);
     const memberId = await tx(async (run) => {
-      if (req.body.memberId) {
+      const { rows: existing } = await run('SELECT id, left_at FROM members WHERE trip_id = $1 AND user_id = $2', [
+        trip.id,
+        user.id,
+      ]);
+      if (existing[0] && !existing[0].left_at) return existing[0].id;
+      if (existing[0]) {
+        await run('UPDATE members SET left_at = NULL WHERE id = $1', [existing[0].id]);
+      } else if (req.body.memberId) {
         const { rows } = await run(
-          `UPDATE members SET token_hash = $1
-           WHERE id = $2 AND trip_id = $3 AND token_hash IS NULL AND left_at IS NULL RETURNING id`,
-          [hash(token), req.body.memberId, trip.id],
+          `UPDATE members SET user_id = $1, phone = CASE WHEN phone = '' THEN $4 ELSE phone END
+           WHERE id = $2 AND trip_id = $3 AND user_id IS NULL AND left_at IS NULL RETURNING id`,
+          [user.id, req.body.memberId, trip.id, user.phone],
         );
         if (!rows[0]) throw new HttpError(409, 'Someone already joined as this person. Ask the leader to free it up.');
-        await bump(run, trip.id);
-        return rows[0].id;
+      } else {
+        await run('INSERT INTO members (id, trip_id, name, color, user_id, phone) VALUES ($1, $2, $3, $4, $5, $6)', [
+          id(),
+          trip.id,
+          str(req.body.name, 40) || user.name,
+          await nextColor(run, trip.id),
+          user.id,
+          user.phone,
+        ]);
       }
-      const name = str(req.body.name, 40);
-      if (!name) throw bad('Add your name');
-      const newId = id();
-      await run(
-        'INSERT INTO members (id, trip_id, name, color, token_hash) VALUES ($1, $2, $3, $4, $5)',
-        [newId, trip.id, name, await nextColor(run, trip.id), hash(token)],
-      );
       await bump(run, trip.id);
-      return newId;
+      const { rows } = await run('SELECT id FROM members WHERE trip_id = $1 AND user_id = $2', [trip.id, user.id]);
+      return rows[0].id;
     });
-    res.status(201).json({ memberId, token });
+    res.status(201).json({ memberId });
   }),
 );
 
@@ -229,7 +390,7 @@ app.patch(
     }
     await query(
       `UPDATE members SET name=$1, phone=$2, role=$3,
-         token_hash = CASE WHEN $4 THEN NULL ELSE token_hash END,
+         user_id = CASE WHEN $4 THEN NULL ELSE user_id END,
          left_at = CASE WHEN $5 THEN now() WHEN $6 THEN NULL ELSE left_at END
        WHERE id = $7`,
       [

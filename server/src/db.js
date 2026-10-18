@@ -90,6 +90,20 @@ async function migrate() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )`,
+    `CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      phone TEXT UNIQUE NOT NULL,
+      name TEXT NOT NULL,
+      pass_hash TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )`,
+    `CREATE TABLE IF NOT EXISTS auth_sessions (
+      token_hash TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )`,
+    `ALTER TABLE members ADD COLUMN IF NOT EXISTS user_id TEXT REFERENCES users(id) ON DELETE SET NULL`,
+    `CREATE INDEX IF NOT EXISTS members_user_idx ON members(user_id)`,
     `CREATE INDEX IF NOT EXISTS entries_trip_idx ON entries(trip_id, date DESC)`,
     `CREATE TABLE IF NOT EXISTS places (
       id TEXT PRIMARY KEY,

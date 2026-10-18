@@ -1,12 +1,12 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
-import { api, ApiError, sessions } from '../lib/api';
+import { api, ApiError } from '../lib/api';
 import { TopBar } from '../components/ui';
 
 export function CreateTrip() {
   const nav = useNavigate();
-  const [form, setForm] = useState({ name: '', destination: '', leaderName: '', startDate: '', endDate: '' });
+  const [form, setForm] = useState({ name: '', destination: '', startDate: '', endDate: '' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const set = (k: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [k]: e.target.value });
@@ -17,7 +17,6 @@ export function CreateTrip() {
     setError('');
     try {
       const res = await api.createTrip(form);
-      sessions.set(res.code, { memberId: res.memberId, token: res.token, tripName: form.name });
       nav(`/t/${res.code}/trip`, { replace: true, state: { created: true } });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not create the trip');
@@ -53,14 +52,10 @@ export function CreateTrip() {
               <input className="input" type="date" value={form.endDate} min={form.startDate || undefined} onChange={set('endDate')} />
             </label>
           </div>
-          <label className="field">
-            <span>Your name</span>
-            <input className="input" value={form.leaderName} onChange={set('leaderName')} placeholder="Aashish" required maxLength={40} autoComplete="given-name" />
-          </label>
           <p className="hint">You'll be the trip leader. You can add friends and hand over leadership later.</p>
           {error && <p className="form-error" role="alert">{error}</p>}
           <div className="pad">
-            <button className="btn block" disabled={busy || !form.name.trim() || !form.leaderName.trim()}>
+            <button className="btn block" disabled={busy || !form.name.trim()}>
               {busy ? 'Creating…' : 'Create trip'}
             </button>
           </div>

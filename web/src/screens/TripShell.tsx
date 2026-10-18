@@ -1,9 +1,11 @@
-import { createContext, useCallback, useContext, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
-import { Home as HomeIcon, ReceiptText, Plus, ArrowLeftRight, Map, ChevronLeft } from 'lucide-react';
-import { sessions } from '../lib/api';
+import { Home as HomeIcon, ReceiptText, Plus, ArrowLeftRight, Map, ChevronLeft, ChevronDown } from 'lucide-react';
+import { recent } from '../lib/api';
 import { TripProvider, useTrip } from '../lib/trip-context';
 import { Spinner } from '../components/ui';
+import { TripSwitcher } from '../components/TripSwitcher';
+import { markLaunched } from './Landing';
 import { EntrySheet, type EntryDraft } from '../sheets/EntrySheet';
 import { Home } from './Home';
 import { Spend } from './Spend';
@@ -12,6 +14,8 @@ import { TripInfo } from './TripInfo';
 
 const SheetCtx = createContext<(d?: EntryDraft) => void>(() => {});
 export const useOpenEntry = () => useContext(SheetCtx);
+const SwitcherCtx = createContext<() => void>(() => {});
+export const useOpenSwitcher = () => useContext(SwitcherCtx);
 
 const TABS = [
   { to: '', label: 'Home', icon: HomeIcon, end: true },
@@ -22,10 +26,12 @@ const TABS = [
 
 export function TripShell() {
   const { code = '' } = useParams();
-  const session = sessions.get(code);
-  if (!session) return <Navigate to={`/join/${code.toUpperCase()}`} replace />;
+  useEffect(() => {
+    markLaunched();
+    recent.touch(code);
+  }, [code]);
   return (
-    <TripProvider code={code.toUpperCase()} session={session}>
+    <TripProvider code={code.toUpperCase()}>
       <Shell />
     </TripProvider>
   );
@@ -36,6 +42,8 @@ function Shell() {
   const location = useLocation();
   const [draft, setDraft] = useState<EntryDraft | null>(null);
   const [open, setOpen] = useState(false);
+  const [switcher, setSwitcher] = useState(false);
+  const openSwitcher = useCallback(() => setSwitcher(true), []);
   const openEntry = useCallback((d?: EntryDraft) => {
     setDraft(d ?? { kind: 'expense' });
     setOpen(true);
@@ -55,22 +63,25 @@ function Shell() {
   }
 
   if (!me) {
-    // Leader released this seat or removed the person.
-    sessions.remove(code);
+    // Not on this trip (or the leader freed your seat): offer to join.
     return <Navigate to={`/join/${code}`} replace />;
   }
 
   return (
     <SheetCtx.Provider value={openEntry}>
+      <SwitcherCtx.Provider value={openSwitcher}>
       <div className="shell">
         <aside className="sidebar" aria-label="Trip navigation">
-          <Link to="/" className="sidebar-back">
+          <Link to="/?all" className="sidebar-back">
             <ChevronLeft size={16} /> All trips
           </Link>
-          <div className="sidebar-trip">
-            <div className="sidebar-name">{data.trip.name}</div>
-            <div className="faint num">{code}</div>
-          </div>
+          <button className="sidebar-trip" onClick={openSwitcher} aria-label={`${data.trip.name}, switch trip`}>
+            <span>
+              <span className="sidebar-name">{data.trip.name}</span>
+              <span className="faint num">{code}</span>
+            </span>
+            <ChevronDown size={16} className="faint" />
+          </button>
           <button className="btn block" onClick={() => openEntry()}>
             <Plus size={18} /> Add payment
           </button>
@@ -116,6 +127,8 @@ function Shell() {
         </nav>
       </div>
       <EntrySheet open={open} onOpenChange={setOpen} draft={draft} />
+      <TripSwitcher open={switcher} onOpenChange={setSwitcher} current={code} />
+      </SwitcherCtx.Provider>
     </SheetCtx.Provider>
   );
 }

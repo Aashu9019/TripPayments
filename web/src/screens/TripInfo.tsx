@@ -1,19 +1,21 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Copy, Pencil, Phone, Plus, Share2 } from 'lucide-react';
+import { Copy, Pencil, Plus, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLoadedTrip } from '../lib/trip-context';
-import { sessions } from '../lib/api';
+import { api, ApiError } from '../lib/api';
+import { useOpenSwitcher } from './TripShell';
+import { TripTitle } from '../components/TripSwitcher';
+import { ContactButtons, formatPhone } from '../components/ContactButtons';
 import { dateRange } from '../lib/format';
 import { shareInvite } from '../lib/share';
 import type { Member, Place, PlaceKind } from '../lib/types';
 import { Avatar, TopBar } from '../components/ui';
 import { MemberSheet, PlaceSheet, TripEditSheet } from '../sheets/TripSheets';
 
-const telHref = (p: string) => `tel:${p.replace(/[^\d+]/g, '')}`;
-
 export function TripInfo() {
-  const { data, me, isLeader, code } = useLoadedTrip();
+  const { data, me, isLeader, code, mutate } = useLoadedTrip();
+  const openSwitcher = useOpenSwitcher();
   const nav = useNavigate();
   const location = useLocation();
   const [place, setPlace] = useState<{ kind: PlaceKind; place?: Place } | null>(null);
@@ -41,19 +43,24 @@ export function TripInfo() {
       </button>
     );
 
-  const leave = () => {
-    if (!confirm('Sign out of this trip on this device? You can join again with the code.')) return;
-    sessions.remove(code);
-    nav('/', { replace: true });
+  const leave = async () => {
+    if (!me || !confirm('Leave this trip? Your payments stay, and you can rejoin with the code.')) return;
+    try {
+      await mutate(() => api.updateMember(code, me.id, { left: true }));
+      nav('/?all', { replace: true });
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'Could not leave');
+    }
   };
 
   return (
     <>
       <TopBar>
-        <h1>
-          {t.name}
-          <span className="sub">{[t.destination, dateRange(t.start_date, t.end_date)].filter(Boolean).join(' · ') || 'Trip details'}</span>
-        </h1>
+        <TripTitle
+          name={t.name}
+          sub={[t.destination, dateRange(t.start_date, t.end_date)].filter(Boolean).join(' · ') || 'Trip details'}
+          onOpen={openSwitcher}
+        />
         {isLeader && (
           <button className="icon-btn" aria-label="Edit trip details" onClick={() => setEditTrip(true)}>
             <Pencil size={18} />
@@ -162,7 +169,7 @@ export function TripInfo() {
                         {m.id === me?.id && <span className="faint"> (you)</span>}
                       </div>
                       <div className="row-sub">
-                        {m.left_at ? 'Left the trip' : m.claimed ? m.phone || 'Joined' : 'Hasn’t joined yet'}
+                        {m.left_at ? 'Left the trip' : m.claimed ? (m.phone ? formatPhone(m.phone) : 'Joined') : 'Hasn’t joined yet'}
                       </div>
                     </div>
                     {m.role === 'leader' && <span className="tag accent">Leader</span>}
@@ -179,11 +186,7 @@ export function TripInfo() {
                         {inner}
                       </div>
                     )}
-                    {m.phone && m.id !== me?.id && (
-                      <a className="call-btn" href={telHref(m.phone)} aria-label={`Call ${m.name}`}>
-                        <Phone size={18} />
-                      </a>
-                    )}
+                    {m.phone && m.id !== me?.id && <ContactButtons phone={m.phone} name={m.name} />}
                   </li>
                 );
               })}
@@ -205,9 +208,11 @@ export function TripInfo() {
           )}
 
           <div className="pad" style={{ paddingTop: 24 }}>
-            <button className="btn ghost block" onClick={leave}>
-              Sign out of this trip
-            </button>
+            {!isLeader && (
+              <button className="btn danger block" onClick={leave}>
+                Leave this trip
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -239,11 +244,7 @@ function PlaceRow({ p, onEdit, children }: { p: Place; onEdit?: () => void; chil
       ) : (
         <div className="row">{body}</div>
       )}
-      {p.phone && (
-        <a className="call-btn" href={telHref(p.phone)} aria-label={`Call ${p.title}`}>
-          <Phone size={18} />
-        </a>
-      )}
+      {p.phone && <ContactButtons phone={p.phone} name={p.title} />}
     </div>
   );
 }

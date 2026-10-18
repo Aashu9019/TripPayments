@@ -1,7 +1,6 @@
-import type { Session, TripState } from './types';
+import type { MyTrip, TripState, User } from './types';
 
 const BASE = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
-const SESSIONS_KEY = 'sajilotrip:sessions';
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -20,33 +19,44 @@ function read<T>(key: string, fallback: T): T {
 
 function write(key: string, value: unknown) {
   try {
-    localStorage.setItem(key, JSON.stringify(value));
+    if (value === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, JSON.stringify(value));
   } catch {
     /* storage full or blocked: the app still works online */
   }
 }
 
-export const sessions = {
-  all: () => read<Record<string, Session>>(SESSIONS_KEY, {}),
-  get: (code: string) => sessions.all()[code.toUpperCase()] ?? null,
-  set: (code: string, s: Session) => write(SESSIONS_KEY, { ...sessions.all(), [code.toUpperCase()]: s }),
-  remove: (code: string) => {
-    const all = sessions.all();
-    delete all[code.toUpperCase()];
-    write(SESSIONS_KEY, all);
-  },
+/** Signed-in account on this device. */
+export const auth = {
+  get: () => read<{ token: string; user: User } | null>('sajilotrip:auth', null),
+  set: (v: { token: string; user: User } | null) => write('sajilotrip:auth', v),
+};
+
+/** When each trip was last opened here, so the app can reopen the latest one. */
+export const recent = {
+  all: () => read<Record<string, number>>('sajilotrip:recent', {}),
+  touch: (code: string) => write('sajilotrip:recent', { ...recent.all(), [code.toUpperCase()]: Date.now() }),
+  latest: () => Object.entries(recent.all()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null,
 };
 
 export const cache = {
   get: (code: string) => read<TripState | null>(`sajilotrip:trip:${code.toUpperCase()}`, null),
   set: (code: string, s: TripState) => write(`sajilotrip:trip:${code.toUpperCase()}`, s),
+  trips: () => read<MyTrip[] | null>('sajilotrip:my-trips', null),
+  setTrips: (t: MyTrip[]) => write('sajilotrip:my-trips', t),
 };
 
-async function request<T>(method: string, path: string, body?: unknown, code?: string): Promise<T> {
+/** Called when the server says the session is gone, so the app can show sign-in. */
+let onSignedOut: () => void = () => {};
+export const setSignedOutHandler = (fn: () => void) => {
+  onSignedOut = fn;
+};
+
+async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const headers: Record<string, string> = {};
   if (body !== undefined) headers['content-type'] = 'application/json';
-  const token = code ? sessions.get(code)?.token : undefined;
-  if (token) headers['x-member-token'] = token;
+  const token = auth.get()?.token;
+  if (token) headers.authorization = `Bearer ${token}`;
   let res: Response;
   try {
     res = await fetch(`${BASE}/api${path}`, {
@@ -58,32 +68,37 @@ async function request<T>(method: string, path: string, body?: unknown, code?: s
     throw new ApiError(0, "Can't reach the server. Check your connection.");
   }
   const data = await res.json().catch(() => ({}));
+  if (res.status === 401 && token && !path.startsWith('/auth/')) onSignedOut();
   if (!res.ok) throw new ApiError(res.status, data.error ?? 'Something went wrong');
   return data as T;
 }
 
 const t = (code: string) => `/trips/${encodeURIComponent(code.toUpperCase())}`;
+type AuthRes = { token: string; user: User };
 
 export const api = {
-  createTrip: (body: { name: string; leaderName: string; destination?: string; startDate?: string; endDate?: string }) =>
-    request<{ code: string; memberId: string; token: string }>('POST', '/trips', body),
+  signup: (body: { phone: string; name: string; password: string }) => request<AuthRes>('POST', '/auth/signup', body),
+  login: (body: { phone: string; password: string }) => request<AuthRes>('POST', '/auth/login', body),
+  logout: () => request('POST', '/auth/logout', {}),
+  myTrips: () => request<{ trips: MyTrip[] }>('GET', '/me/trips'),
+  createTrip: (body: { name: string; destination?: string; startDate?: string; endDate?: string }) =>
+    request<{ code: string }>('POST', '/trips', body),
   getTrip: (code: string, v?: number) =>
     request<TripState | { unchanged: true }>('GET', `${t(code)}${v ? `?v=${v}` : ''}`),
   join: (code: string, body: { memberId?: string; name?: string }) =>
-    request<{ memberId: string; token: string }>('POST', `${t(code)}/join`, body),
-  updateTrip: (code: string, body: Record<string, unknown>) => request('PATCH', t(code), body, code),
+    request<{ memberId: string }>('POST', `${t(code)}/join`, body),
+  updateTrip: (code: string, body: Record<string, unknown>) => request('PATCH', t(code), body),
   addMember: (code: string, body: { name: string; phone?: string }) =>
-    request<{ id: string }>('POST', `${t(code)}/members`, body, code),
+    request<{ id: string }>('POST', `${t(code)}/members`, body),
   updateMember: (code: string, id: string, body: Record<string, unknown>) =>
-    request('PATCH', `${t(code)}/members/${id}`, body, code),
-  removeMember: (code: string, id: string) => request('DELETE', `${t(code)}/members/${id}`, undefined, code),
-  addEntry: (code: string, body: Record<string, unknown>) =>
-    request<{ id: string }>('POST', `${t(code)}/entries`, body, code),
+    request('PATCH', `${t(code)}/members/${id}`, body),
+  removeMember: (code: string, id: string) => request('DELETE', `${t(code)}/members/${id}`),
+  addEntry: (code: string, body: Record<string, unknown>) => request<{ id: string }>('POST', `${t(code)}/entries`, body),
   updateEntry: (code: string, id: string, body: Record<string, unknown>) =>
-    request('PUT', `${t(code)}/entries/${id}`, body, code),
-  deleteEntry: (code: string, id: string) => request('DELETE', `${t(code)}/entries/${id}`, undefined, code),
-  addPlace: (code: string, body: Record<string, unknown>) => request('POST', `${t(code)}/places`, body, code),
+    request('PUT', `${t(code)}/entries/${id}`, body),
+  deleteEntry: (code: string, id: string) => request('DELETE', `${t(code)}/entries/${id}`),
+  addPlace: (code: string, body: Record<string, unknown>) => request('POST', `${t(code)}/places`, body),
   updatePlace: (code: string, id: string, body: Record<string, unknown>) =>
-    request('PUT', `${t(code)}/places/${id}`, body, code),
-  deletePlace: (code: string, id: string) => request('DELETE', `${t(code)}/places/${id}`, undefined, code),
+    request('PUT', `${t(code)}/places/${id}`, body),
+  deletePlace: (code: string, id: string) => request('DELETE', `${t(code)}/places/${id}`),
 };

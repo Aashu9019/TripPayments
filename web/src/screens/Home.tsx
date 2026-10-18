@@ -4,12 +4,14 @@ import { useLoadedTrip } from '../lib/trip-context';
 import { dateRange, money } from '../lib/format';
 import { Avatar, TopBar } from '../components/ui';
 import { EntryRow } from '../components/EntryRow';
-import { useOpenEntry } from './TripShell';
+import { useOpenEntry, useOpenSwitcher } from './TripShell';
+import { TripTitle } from '../components/TripSwitcher';
 import { shareInvite } from '../lib/share';
 
 export function Home() {
   const { data, me, member, code } = useLoadedTrip();
   const open = useOpenEntry();
+  const openSwitcher = useOpenSwitcher();
   const { ledger, trip } = data;
   const cur = trip.currency;
   const myNet = me ? (ledger.net[me.id] ?? 0) : 0;
@@ -21,10 +23,11 @@ export function Home() {
   return (
     <>
       <TopBar>
-        <h1>
-          {trip.name}
-          <span className="sub">{[trip.destination, dateRange(trip.start_date, trip.end_date)].filter(Boolean).join(' · ') || code}</span>
-        </h1>
+        <TripTitle
+          name={trip.name}
+          sub={[trip.destination, dateRange(trip.start_date, trip.end_date)].filter(Boolean).join(' · ') || code}
+          onOpen={openSwitcher}
+        />
         <button className="icon-btn" aria-label="Invite friends" onClick={() => shareInvite(code, trip.name)}>
           <Share2 size={20} />
         </button>

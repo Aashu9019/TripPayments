@@ -1251,3 +1251,90 @@ textarea.input {
     }
   }
 }
+
+/* ---------- Accounts, switcher, contact buttons ---------- */
+
+.contact-btns {
+  display: flex;
+  flex: none;
+}
+
+.call-btn.wa {
+  color: #1f9e57;
+}
+
+@media (prefers-color-scheme: dark) {
+  .call-btn.wa {
+    color: #4fcf86;
+  }
+}
+
+.title-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  margin: -4px -6px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: background-color 120ms ease, transform 140ms var(--ease-out);
+}
+
+.title-btn:active {
+  transform: scale(0.98);
+  background: var(--paper-2);
+}
+
+.title-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar h1 .sub {
+  margin-top: 2px;
+}
+
+.accent-ink {
+  color: var(--accent);
+  flex: none;
+}
+
+.auth-form {
+  margin: 32px calc(var(--gutter) * -1) 0;
+}
+
+@media (min-width: 960px) {
+  .sidebar-trip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    margin: -8px;
+    width: calc(100% + 16px);
+    padding: 8px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    text-align: left;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    transition: background-color 120ms ease;
+  }
+
+  .sidebar-trip:hover {
+    background: var(--paper-2);
+  }
+
+  .sidebar-trip > span {
+    display: grid;
+    min-width: 0;
+  }
+}

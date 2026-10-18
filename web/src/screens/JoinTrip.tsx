@@ -1,30 +1,32 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
-import { api, ApiError, sessions } from '../lib/api';
+import { api, ApiError } from '../lib/api';
+import { useAuth } from '../lib/auth-context';
 import { Avatar, Spinner, TopBar } from '../components/ui';
 import type { TripState } from '../lib/types';
 
 export function JoinTrip() {
   const { code: param } = useParams();
   const nav = useNavigate();
+  const { user } = useAuth();
   const [code, setCode] = useState('');
   const [trip, setTrip] = useState<TripState | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [name, setName] = useState('');
 
   useEffect(() => {
     if (!param) return;
-    if (sessions.get(param)) {
-      nav(`/t/${param.toUpperCase()}`, { replace: true });
-      return;
-    }
     setError('');
     api
       .getTrip(param)
-      .then((r) => 'trip' in r && setTrip(r))
+      .then((r) => {
+        if (!('trip' in r)) return;
+        // Already on this trip: go straight in.
+        if (r.meId) nav(`/t/${param.toUpperCase()}`, { replace: true });
+        else setTrip(r);
+      })
       .catch((e) => setError(e instanceof ApiError ? e.message : 'Could not load the trip'));
   }, [param, nav]);
 
@@ -34,12 +36,11 @@ export function JoinTrip() {
     if (c.length === 6) nav(`/join/${c}`);
   }
 
-  async function join(body: { memberId?: string; name?: string }) {
-    if (!param || !trip) return;
+  async function join(body: { memberId?: string }) {
+    if (!param) return;
     setBusy(true);
     try {
-      const res = await api.join(param, body);
-      sessions.set(param, { memberId: res.memberId, token: res.token, tripName: trip.trip.name });
+      await api.join(param, body);
       nav(`/t/${param.toUpperCase()}`, { replace: true });
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : 'Could not join');
@@ -48,7 +49,7 @@ export function JoinTrip() {
   }
 
   const back = (
-    <button className="icon-btn" onClick={() => nav(param ? '/join' : '/')} aria-label="Back">
+    <button className="icon-btn" onClick={() => nav(param ? '/join' : '/?all')} aria-label="Back">
       <ChevronLeft size={22} />
     </button>
   );
@@ -73,7 +74,6 @@ export function JoinTrip() {
                 autoCapitalize="characters"
                 autoComplete="off"
                 spellCheck={false}
-                inputMode="text"
               />
             </label>
             <div className="pad">
@@ -126,24 +126,23 @@ export function JoinTrip() {
                 </ul>
               </section>
             )}
-            <form
-              className="section"
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (name.trim()) join({ name });
-              }}
-            >
-              <div className="section-head">{open.length ? 'Not on the list?' : 'Your name'}</div>
-              <label className="field">
-                <span className="visually-hidden">Your name</span>
-                <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" maxLength={40} />
-              </label>
-              <div className="pad">
-                <button className="btn block" disabled={busy || !name.trim()}>
-                  Join {trip.trip.name}
-                </button>
-              </div>
-            </form>
+            <section className="section">
+              <div className="section-head">{open.length ? 'Not on the list?' : 'Join this trip'}</div>
+              <ul className="list">
+                <li>
+                  <button className="row" disabled={busy} onClick={() => join({})}>
+                    <span className="glyph">
+                      <UserPlus size={18} />
+                    </span>
+                    <div className="row-main">
+                      <div className="row-title">Join as {user?.name}</div>
+                      <div className="row-sub">Adds you to the group with your account</div>
+                    </div>
+                    <ChevronRight size={18} className="faint" />
+                  </button>
+                </li>
+              </ul>
+            </section>
           </>
         )}
       </div>

@@ -35,15 +35,19 @@ fewest payments needed to settle everyone.
 
 **Trip**
 - Route, day by day
-- Stays (hotels, teahouses) with tap-to-call numbers
-- Important contacts: driver, guide, porter, rescue
+- Stays (hotels, teahouses) with one-tap **Call** and **WhatsApp** buttons
+- Important contacts: driver, guide, porter, rescue — also Call / WhatsApp
 - Shared notes: permits, packing list, meeting point
 
-**Group**
-- No accounts. The leader creates a trip and shares a 6-letter code or link
-- Friends join by tapping their name
+**Accounts and groups**
+- Sign up with your **phone number** and a password — no email needed
+- **All your trips in one list**, on any phone you sign in on, with your
+  balance in each; switch trips from the trip name at the top
+- Anyone can start a trip for any group; the creator is that trip's leader
+- Friends join with the invite link or 6-letter code and tap their name
+- Every member's number is one tap away (Call / WhatsApp)
 - The leader can add people, hand over leadership, mark someone as left,
-  or sign out a lost phone
+  or free up a seat
 - Everyone's screen updates within a few seconds of any change
 
 **App**
@@ -55,18 +59,19 @@ fewest payments needed to settle everyone.
 
 ## Using the app
 
-1. Open the [live app](https://your-app.netlify.app) and tap **Start a trip**.
+1. Open the [live app](https://your-app.netlify.app), create an account with
+   your phone number, and tap **Start a trip**.
 2. Go to the **Trip** tab: add your friends, the route, stays and phone numbers.
 3. Tap the share icon and send the invite link to the group.
-4. Each friend opens the link and taps their own name.
+4. Each friend opens the link, signs up with their number, and taps their own name.
 5. Anyone taps **+** to log an expense, money into the fund, or a settle-up payment.
 6. At the end, open **Settle** and follow the suggested payments.
 
 **Install it:** Android Chrome → menu → *Install app*. iPhone Safari → Share →
 *Add to Home Screen*.
 
-> The trip code is the key. Anyone who has it can join and see the trip, so
-> share it only with your group.
+> Anyone with the trip code can join the trip, so share it only with your
+> group. Members can see each other's phone numbers.
 
 ## How the math works
 
@@ -169,15 +174,18 @@ then put the Netlify URL into `CORS_ORIGIN` on Render.
 
 ## API
 
-REST API under `/api`; mutations authenticate with an `x-member-token`
-header issued when you create or join a trip. Full reference in
+REST API under `/api`. Sign up or sign in with a phone number to get a
+session token, sent as `Authorization: Bearer <token>`. Full reference in
 [docs/API.md](docs/API.md).
 
 ## Limitations
 
 - Adding or editing needs a connection; offline mode is read-only.
 - One currency per trip (Nepali rupees by default), no conversion.
-- Trust-based: no passwords, anyone with the code can join.
+- No SMS verification of phone numbers (it costs money per message); the
+  number is the login, protected by a password.
+- No password reset yet; the leader can free your seat so you can rejoin
+  from a new account.
 
 ## License
 

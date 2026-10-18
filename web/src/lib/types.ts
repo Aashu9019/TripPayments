@@ -65,6 +65,8 @@ export interface Ledger {
 
 export interface TripState {
   trip: Trip;
+  /** Your member id in this trip, or null if you haven't joined. */
+  meId: string | null;
   members: Member[];
   entries: Entry[];
   places: Place[];
@@ -72,8 +74,22 @@ export interface TripState {
   version: number;
 }
 
-export interface Session {
-  memberId: string;
-  token: string;
-  tripName: string;
+export interface User {
+  id: string;
+  phone: string;
+  name: string;
+}
+
+/** A trip in the signed-in user's list, with their own balance. */
+export interface MyTrip {
+  code: string;
+  name: string;
+  destination: string;
+  start_date: string | null;
+  end_date: string | null;
+  currency: string;
+  role: Role;
+  people: number;
+  total: number;
+  net: number;
 }

@@ -1,13 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { api, ApiError, cache, sessions } from './api';
-import type { Member, Session, TripState } from './types';
+import { api, ApiError, cache } from './api';
+import type { Member, TripState } from './types';
 
 const POLL_MS = 6000;
 
 interface TripCtx {
   code: string;
   data: TripState | null;
-  session: Session;
   me: Member | null;
   isLeader: boolean;
   online: boolean;
@@ -19,7 +18,7 @@ interface TripCtx {
 
 const Ctx = createContext<TripCtx | null>(null);
 
-export function TripProvider({ code, session, children }: { code: string; session: Session; children: ReactNode }) {
+export function TripProvider({ code, children }: { code: string; children: ReactNode }) {
   const [data, setData] = useState<TripState | null>(() => cache.get(code));
   const [online, setOnline] = useState(true);
   const version = useRef<number | undefined>(data?.version);
@@ -66,14 +65,10 @@ export function TripProvider({ code, session, children }: { code: string; sessio
 
   const value = useMemo<TripCtx>(() => {
     const byId = new Map(data?.members.map((m) => [m.id, m]));
-    const me = byId.get(session.memberId) ?? null;
-    if (data && me && session.tripName !== data.trip.name) {
-      sessions.set(code, { ...session, tripName: data.trip.name });
-    }
+    const me = (data?.meId && byId.get(data.meId)) || null;
     return {
       code,
       data,
-      session,
       me,
       isLeader: me?.role === 'leader',
       online,
@@ -81,7 +76,7 @@ export function TripProvider({ code, session, children }: { code: string; sessio
       refresh,
       member: (id) => (id ? byId.get(id) : undefined),
     };
-  }, [code, data, session, online, mutate, refresh]);
+  }, [code, data, online, mutate, refresh]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
