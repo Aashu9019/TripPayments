@@ -31,6 +31,10 @@ export async function connect() {
       },
     };
   } else {
+    // Render's disk is wiped on every deploy; embedded storage there would silently lose all data.
+    if (process.env.RENDER) {
+      throw new Error('DATABASE_URL is not set. Add the Neon connection string in Render > Environment.');
+    }
     const { PGlite, types } = await import('@electric-sql/pglite');
     const db = new PGlite(process.env.PGLITE_DIR ?? './.data', {
       parsers: { [types.INT8]: (v) => Number(v), [types.DATE]: (v) => v },
