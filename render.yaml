@@ -10,13 +10,9 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "22"
+      # Neon Postgres connection string (pooled), set in the Render dashboard.
       - key: DATABASE_URL
-        fromDatabase:
-          name: saathi-db
-          property: connectionString
+        sync: false
+      # Netlify site URL(s), comma-separated, set in the Render dashboard.
       - key: CORS_ORIGIN
         sync: false
-
-databases:
-  - name: saathi-db
-    plan: free

@@ -17,9 +17,10 @@ npm run dev     # API on :8787 + web on http://localhost:5173 (proxies /api)
 
 ## Deploy
 ### API on Render
-1. New > Blueprint, point at this repo. `render.yaml` creates the web service
-   and a Postgres database and wires `DATABASE_URL`.
-2. Set `CORS_ORIGIN` to your Netlify URL (comma-separate several origins).
+1. Create a free Postgres on Neon (neon.tech) and copy the pooled connection string.
+2. Render: New > Blueprint, point at this repo. `render.yaml` creates the web service;
+   paste the Neon string as `DATABASE_URL` when prompted.
+3. Set `CORS_ORIGIN` to your Netlify URL (comma-separate several origins).
 
 ### Web on Netlify
 1. Import repo. `netlify.toml` sets base `web`, build `npm run build`, publish `dist`.
