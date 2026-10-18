@@ -9,8 +9,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Saathi — trip money',
-        short_name: 'Saathi',
+        name: 'SajiloTrip — trip money',
+        short_name: 'SajiloTrip',
         description: 'Who paid, who owes, and what is left in the common fund.',
         theme_color: '#f4f1ea',
         background_color: '#f4f1ea',

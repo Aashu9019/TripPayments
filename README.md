@@ -1,8 +1,8 @@
-# Saathi — trip money, settled
+# SajiloTrip — trip money, settled
 
 **Live app:** https://your-app.netlify.app <!-- replace with the real Netlify URL -->
 
-Saathi is a small shared ledger for groups of friends on a trip. Log who paid
+SajiloTrip is a small shared ledger for groups of friends on a trip. Log who paid
 for what, split it in a tap, and always know who owes whom — including the
 money you pooled into a common fund on day one.
 
@@ -18,7 +18,7 @@ person pays the jeep, another pays for dinner, the pot pays for the flight,
 someone covers a porter for just two people. By the end of the trip nobody
 knows who owes whom.
 
-Saathi keeps one ledger the whole group shares, does the math, and tells each
+SajiloTrip keeps one ledger the whole group shares, does the math, and tells each
 person a single number: **you owe Rs X** or **you get back Rs X** — plus the
 fewest payments needed to settle everyone.
 

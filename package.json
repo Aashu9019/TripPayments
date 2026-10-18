@@ -1,5 +1,5 @@
 {
-  "name": "saathi",
+  "name": "sajilotrip",
   "private": true,
   "scripts": {
     "setup": "npm install && cd server && npm install && cd ../web && npm install",

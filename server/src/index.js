@@ -433,4 +433,4 @@ app.delete(
 
 const port = Number(process.env.PORT) || 8787;
 await connect();
-app.listen(port, () => console.log(`Saathi API on :${port}`));
+app.listen(port, () => console.log(`SajiloTrip API on :${port}`));

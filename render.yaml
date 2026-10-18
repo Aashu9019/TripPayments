@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: saathi-api
+    name: sajilotrip-api
     runtime: node
     rootDir: server
     plan: free

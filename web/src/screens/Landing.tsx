@@ -9,7 +9,7 @@ export function Landing() {
       <main className="landing">
         <div className="wordmark">
           <img src="/icon.svg" alt="" />
-          Saathi
+          SajiloTrip
         </div>
         <h1>Trip money, settled before you're home.</h1>
         <p className="lede">

@@ -1,5 +1,5 @@
 {
-  "name": "saathi-api",
+  "name": "sajilotrip-api",
   "private": true,
   "type": "module",
   "engines": { "node": ">=20" },

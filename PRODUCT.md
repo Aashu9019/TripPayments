@@ -1,4 +1,4 @@
-# Saathi — trip money, settled
+# SajiloTrip — trip money, settled
 
 ## What it is
 A small installable web app (PWA) for groups of friends on a trip. One person

@@ -2,7 +2,7 @@ import { toast } from 'sonner';
 
 export async function shareInvite(code: string, tripName: string) {
   const url = `${location.origin}/join/${code}`;
-  const text = `Join "${tripName}" on Saathi to track trip money. Code: ${code}`;
+  const text = `Join "${tripName}" on SajiloTrip to track trip money. Code: ${code}`;
   if (navigator.share) {
     try {
       await navigator.share({ title: tripName, text, url });

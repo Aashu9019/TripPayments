@@ -1,7 +1,7 @@
 import type { Session, TripState } from './types';
 
 const BASE = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
-const SESSIONS_KEY = 'saathi:sessions';
+const SESSIONS_KEY = 'sajilotrip:sessions';
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -38,8 +38,8 @@ export const sessions = {
 };
 
 export const cache = {
-  get: (code: string) => read<TripState | null>(`saathi:trip:${code.toUpperCase()}`, null),
-  set: (code: string, s: TripState) => write(`saathi:trip:${code.toUpperCase()}`, s),
+  get: (code: string) => read<TripState | null>(`sajilotrip:trip:${code.toUpperCase()}`, null),
+  set: (code: string, s: TripState) => write(`sajilotrip:trip:${code.toUpperCase()}`, s),
 };
 
 async function request<T>(method: string, path: string, body?: unknown, code?: string): Promise<T> {
