@@ -15,7 +15,7 @@ export function Login() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  if (user) return <Navigate to={user.isAdmin && next === '/' ? '/admin' : next} replace />;
+  if (user) return <Navigate to={next} replace />;
 
   async function submit(e: FormEvent) {
     e.preventDefault();

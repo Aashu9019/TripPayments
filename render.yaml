@@ -16,8 +16,3 @@ services:
       # Netlify site URL(s), comma-separated, set in the Render dashboard.
       - key: CORS_ORIGIN
         sync: false
-      # Superadmin login, set in the Render dashboard. Password: 10+ characters.
-      - key: ADMIN_PHONE
-        sync: false
-      - key: ADMIN_PASSWORD
-        sync: false

@@ -52,7 +52,7 @@ export async function connect() {
 // ---------- Tenant scoping (row-level security) ----------
 //
 // Every request runs inside a scope. A trip route declares its trip with
-// useTrip(id); global routes (auth, "my trips", admin) declare useSystem().
+// useTrip(id); global routes (auth, "my trips", profile) declare useSystem().
 // Each query then runs in a transaction that sets:
 //   app.trip_id  - the tenant; RLS policies only expose rows of this trip
 //   app.bypass   - 'on' only for system work
@@ -168,7 +168,7 @@ async function migrate() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )`,
     `ALTER TABLE members ADD COLUMN IF NOT EXISTS user_id TEXT REFERENCES users(id) ON DELETE SET NULL`,
-    `ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false`,
+    `ALTER TABLE users DROP COLUMN IF EXISTS is_admin`,
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_id TEXT`,
     `CREATE TABLE IF NOT EXISTS avatars (
       id TEXT PRIMARY KEY,

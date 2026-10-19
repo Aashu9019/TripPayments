@@ -1,4 +1,4 @@
-import type { AdminStats, AdminTrip, AdminTripDetail, AdminUser, MyTrip, TripState, User } from './types';
+import type { MyTrip, TripState, User } from './types';
 
 const BASE = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
 
@@ -110,16 +110,4 @@ export const api = {
   updatePlace: (code: string, id: string, body: Record<string, unknown>) =>
     request('PUT', `${t(code)}/places/${id}`, body),
   deletePlace: (code: string, id: string) => request('DELETE', `${t(code)}/places/${id}`),
-};
-
-const q = (s: string) => (s ? `?q=${encodeURIComponent(s)}` : '');
-
-export const adminApi = {
-  stats: () => request<AdminStats>('GET', '/admin/stats'),
-  trips: (search = '') => request<{ trips: AdminTrip[] }>('GET', `/admin/trips${q(search)}`),
-  trip: (code: string) => request<AdminTripDetail>('GET', `/admin/trips/${encodeURIComponent(code)}`),
-  deleteTrip: (code: string) => request('DELETE', `/admin/trips/${encodeURIComponent(code)}`),
-  users: (search = '') => request<{ users: AdminUser[] }>('GET', `/admin/users${q(search)}`),
-  deleteUser: (id: string) => request('DELETE', `/admin/users/${id}`),
-  signOutUser: (id: string) => request('DELETE', `/admin/users/${id}/sessions`),
 };

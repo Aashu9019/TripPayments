@@ -10,7 +10,7 @@ row-level security (RLS), not only in application code.
 - Every request runs in its own scope (`AsyncLocalStorage` in `server/src/db.js`).
   Each query runs in a transaction that sets:
   - `app.trip_id` — the tenant the request is working on
-  - `app.bypass` — `on` only for system work (sign-in, "my trips", admin)
+  - `app.bypass` — `on` only for system work (sign-in, "my trips", your profile)
 - Tenant work also switches to the restricted role `sajilo_app`
   (`NOLOGIN NOBYPASSRLS`), so policies apply even if the connection role
   could normally bypass them.

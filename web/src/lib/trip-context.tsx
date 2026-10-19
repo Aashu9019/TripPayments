@@ -10,7 +10,7 @@ interface TripCtx {
   me: Member | null;
   isLeader: boolean;
   online: boolean;
-  /** The trip no longer exists (deleted by its leader or an admin). */
+  /** The trip no longer exists (deleted by its leader). */
   gone: boolean;
   /** Run a mutation then pull fresh state. Errors bubble to the caller. */
   mutate: <T>(fn: () => Promise<T>) => Promise<T>;

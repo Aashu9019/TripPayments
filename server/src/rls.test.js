@@ -48,7 +48,7 @@ test('no tenant declared: sees nothing (fails closed)', () =>
     assert.deepEqual(await titles('SELECT phone FROM users'), []);
   }));
 
-test('system scope sees everything (sign-in, admin)', () =>
+test('system scope sees everything (sign-in, my trips)', () =>
   inScope(async () => {
     useSystem();
     assert.equal((await titles('SELECT name FROM trips')).length, 2);

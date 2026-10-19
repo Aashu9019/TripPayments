@@ -3,7 +3,6 @@ import cors from 'cors';
 import crypto from 'node:crypto';
 import { connect, query, tx, sys, inScope, useTrip, useSystem } from './db.js';
 import { computeBalances, equalShares } from './ledger.js';
-import { adminRoutes, ensureAdmin } from './admin.js';
 import { avatarRoutes } from './avatars.js';
 
 const app = express();
@@ -102,7 +101,7 @@ async function currentUser(req) {
   const token = header.startsWith('Bearer ') ? header.slice(7) : '';
   if (!token) return null;
   const { rows } = await sys(
-    'SELECT u.id, u.phone, u.name, u.is_admin, u.avatar_id FROM auth_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1',
+    'SELECT u.id, u.phone, u.name, u.avatar_id FROM auth_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1',
     [hash(token)],
   );
   return rows[0] ?? null;
@@ -228,7 +227,7 @@ app.post(
       await hashPassword(password),
     ]);
     await linkSeatsByPhone(query, userId, phone);
-    res.status(201).json({ token: await newSession(userId), user: { id: userId, phone, name, isAdmin: false } });
+    res.status(201).json({ token: await newSession(userId), user: { id: userId, phone, name } });
   }),
 );
 
@@ -244,7 +243,7 @@ app.post(
     const user = rows[0];
     if (!user || !(await checkPassword(password, user.pass_hash))) throw new HttpError(401, 'Wrong phone number or password');
     await linkSeatsByPhone(query, user.id, user.phone);
-    res.json({ token: await newSession(user.id), user: { id: user.id, phone: user.phone, name: user.name, isAdmin: user.is_admin, avatarId: user.avatar_id } });
+    res.json({ token: await newSession(user.id), user: { id: user.id, phone: user.phone, name: user.name, avatarId: user.avatar_id } });
   }),
 );
 
@@ -262,8 +261,8 @@ app.get(
   '/api/auth/me',
   wrap(async (req, res) => {
     useSystem();
-    const { is_admin, avatar_id, ...user } = await requireUser(req);
-    res.json({ user: { ...user, isAdmin: is_admin, avatarId: avatar_id } });
+    const { avatar_id, ...user } = await requireUser(req);
+    res.json({ user: { ...user, avatarId: avatar_id } });
   }),
 );
 
@@ -692,10 +691,8 @@ app.delete(
   }),
 );
 
-adminRoutes(app, { query, wrap, requireUser, HttpError, computeBalances, useSystem });
 avatarRoutes(app, { query, tx, wrap, requireUser, HttpError, id, useSystem, loadTrip });
 
 const port = Number(process.env.PORT) || 8787;
 await connect();
-await ensureAdmin({ query: sys, id, normalizePhone, hashPassword });
 app.listen(port, () => console.log(`SajiloTrip API on :${port}`));
