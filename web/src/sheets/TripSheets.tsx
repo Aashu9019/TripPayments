@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { api, ApiError } from '../lib/api';
 import { useLoadedTrip } from '../lib/trip-context';
 import type { Member, Place, PlaceKind } from '../lib/types';
-import { Sheet } from '../components/ui';
+import { FINE_POINTER, Sheet } from '../components/ui';
 
 const PLACE_COPY: Record<PlaceKind, { add: string; title: string; placeholder: string }> = {
   stop: { add: 'Add route stop', title: 'Place', placeholder: 'Ringmo village' },
@@ -85,7 +85,7 @@ export function PlaceSheet({
     >
       <label className="field">
         <span>{copy.title}</span>
-        <input className="input" value={f.title} onChange={set('title')} placeholder={copy.placeholder} maxLength={80} autoFocus={!place} />
+        <input className="input" value={f.title} onChange={set('title')} placeholder={copy.placeholder} maxLength={80} autoFocus={!place && FINE_POINTER} />
       </label>
       {kind !== 'stop' && (
         <label className="field">
@@ -165,7 +165,7 @@ export function MemberSheet({
     >
       <label className="field">
         <span>Name</span>
-        <input className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={40} autoFocus={!member} placeholder="Asha" />
+        <input className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={40} autoFocus={!member && FINE_POINTER} placeholder="Asha" />
       </label>
       <label className="field">
         <span>Phone</span>

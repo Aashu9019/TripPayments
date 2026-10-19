@@ -4,7 +4,7 @@ import { api, ApiError } from '../lib/api';
 import { useLoadedTrip } from '../lib/trip-context';
 import { CATEGORIES, money, parseMoney, toInput, today } from '../lib/format';
 import type { Entry, EntryKind } from '../lib/types';
-import { Avatar, Check, Sheet } from '../components/ui';
+import { Avatar, Check, FINE_POINTER, Sheet } from '../components/ui';
 
 export interface EntryDraft {
   kind: EntryKind;
@@ -172,7 +172,7 @@ export function EntrySheet({
           value={amount}
           onChange={(e) => setAmount(e.target.value.replace(/[^\d.,]/g, ''))}
           aria-label="Amount"
-          autoFocus={!editing}
+          autoFocus={!editing && FINE_POINTER}
         />
       </label>
 
