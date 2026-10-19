@@ -31,6 +31,13 @@ export function TripProvider({ code, children }: { code: string; children: React
       const res = await api.getTrip(code, version.current);
       setOnline(true);
       if ('unchanged' in res) return;
+      if (res.preview) {
+        // Not (or no longer) a member: forget anything saved for this trip on this device.
+        cache.drop(code);
+        version.current = undefined;
+        setData(res);
+        return;
+      }
       version.current = res.version;
       cache.set(code, res);
       setData(res);

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
-    "test": "node --test src/ledger.test.js"
+    "test": "node --test src/ledger.test.js src/rls.test.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

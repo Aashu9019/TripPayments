@@ -27,8 +27,9 @@ export async function ensureAdmin({ query, id, normalizePhone, hashPassword }) {
   console.log('Admin account ready for', phone);
 }
 
-export function adminRoutes(app, { query, wrap, requireUser, HttpError, computeBalances }) {
+export function adminRoutes(app, { query, wrap, requireUser, HttpError, computeBalances, useSystem }) {
   const requireAdmin = async (req) => {
+    useSystem();
     const user = await requireUser(req);
     if (!user.is_admin) throw new HttpError(403, 'Admins only');
     return user;

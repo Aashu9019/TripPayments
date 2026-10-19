@@ -195,6 +195,13 @@ then put the Netlify URL into `CORS_ORIGIN` on Render.
 `VITE_API_URL` is baked in at build time — after changing it, use
 *Clear cache and deploy site*.
 
+## Data isolation
+
+Every trip is a separate tenant, enforced by Postgres row-level security:
+a request can only read or change rows of the trip it is working on, even
+if a query forgets to filter. Non-members get a join preview only. Details
+and tests: [docs/SECURITY.md](docs/SECURITY.md).
+
 ## API
 
 REST API under `/api`. Sign up or sign in with a phone number to get a

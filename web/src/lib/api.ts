@@ -42,6 +42,7 @@ export const recent = {
 export const cache = {
   get: (code: string) => read<TripState | null>(`sajilotrip:trip:${code.toUpperCase()}`, null),
   set: (code: string, s: TripState) => write(`sajilotrip:trip:${code.toUpperCase()}`, s),
+  drop: (code: string) => write(`sajilotrip:trip:${code.toUpperCase()}`, null),
   trips: () => read<MyTrip[] | null>('sajilotrip:my-trips', null),
   setTrips: (t: MyTrip[]) => write('sajilotrip:my-trips', t),
 };

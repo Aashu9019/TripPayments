@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import crypto from 'node:crypto';
-import { connect, query, tx } from './db.js';
+import { connect, query, tx, sys, inScope, useTrip, useSystem } from './db.js';
 import { computeBalances, equalShares } from './ledger.js';
 import { adminRoutes, ensureAdmin } from './admin.js';
 import { avatarRoutes } from './avatars.js';
@@ -45,15 +45,30 @@ const money = (v) => {
   return n;
 };
 
+// Every request gets its own tenant scope (see db.js); nothing is visible until a route declares one.
 const wrap = (fn) => (req, res) =>
-  fn(req, res).catch((e) => {
+  inScope(() => fn(req, res)).catch((e) => {
     if (!(e instanceof HttpError)) console.error(e);
     res.status(e.status ?? 500).json({ error: e.status ? e.message : 'Something went wrong' });
   });
 
-async function loadTrip(code) {
-  const { rows } = await query('SELECT * FROM trips WHERE code = $1', [String(code).toUpperCase()]);
-  if (!rows[0]) throw new HttpError(404, 'No trip with that code');
+// Guessing trip codes: at most 30 unknown codes per IP per 10 minutes.
+const misses = new Map();
+function noteMiss(ip) {
+  const now = Date.now();
+  const m = misses.get(ip);
+  if (!m || now - m.start > 10 * 60_000) misses.set(ip, { start: now, n: 1 });
+  else if (++m.n > 30) throw new HttpError(429, 'Too many tries. Wait a few minutes.');
+}
+
+/** Find a trip by its code and make it this request's tenant. */
+async function loadTrip(code, req) {
+  const { rows } = await sys('SELECT * FROM trips WHERE code = $1', [String(code).toUpperCase()]);
+  if (!rows[0]) {
+    if (req) noteMiss(req.ip);
+    throw new HttpError(404, 'No trip with that code');
+  }
+  useTrip(rows[0].id);
   return rows[0];
 }
 
@@ -77,7 +92,7 @@ async function checkPassword(password, stored) {
 
 async function newSession(userId) {
   const token = crypto.randomBytes(32).toString('base64url');
-  await query('INSERT INTO auth_sessions (token_hash, user_id) VALUES ($1, $2)', [hash(token), userId]);
+  await sys('INSERT INTO auth_sessions (token_hash, user_id) VALUES ($1, $2)', [hash(token), userId]);
   return token;
 }
 
@@ -86,7 +101,7 @@ async function currentUser(req) {
   const header = req.get('authorization') ?? '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : '';
   if (!token) return null;
-  const { rows } = await query(
+  const { rows } = await sys(
     'SELECT u.id, u.phone, u.name, u.is_admin, u.avatar_id FROM auth_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1',
     [hash(token)],
   );
@@ -150,18 +165,36 @@ async function nextColor(run, tripId) {
   return rows[0].n % 8;
 }
 
+const MEMBER_COLS = `m.id, m.name, m.role, m.phone, m.color, m.left_at, m.created_at, m.user_id, COALESCE(u.avatar_id, m.avatar_id) AS avatar`;
+const ENTRY_COLS = 'id, kind, title, category, amount, from_id, to_id, split_mode, shares, date, note, created_by, created_at, updated_at';
+const PLACE_COLS = 'id, kind, title, phone, address, day, note, sort, created_at';
+
 async function state(trip, userId = null) {
-  const [members, entries, places] = await Promise.all([
-    query(
-      `SELECT m.id, m.name, m.role, m.phone, m.color, m.left_at, m.created_at, m.user_id, COALESCE(u.avatar_id, m.avatar_id) AS avatar
-       FROM members m LEFT JOIN users u ON u.id = m.user_id WHERE m.trip_id = $1 ORDER BY m.created_at`,
+  const [members, entries, places] = await tx(async (run) => [
+    await run(
+      `SELECT ${MEMBER_COLS} FROM members m LEFT JOIN users u ON u.id = m.user_id WHERE m.trip_id = $1 ORDER BY m.created_at`,
       [trip.id],
     ),
-    query('SELECT * FROM entries WHERE trip_id = $1 ORDER BY date DESC, created_at DESC', [trip.id]),
-    query('SELECT * FROM places WHERE trip_id = $1 ORDER BY kind, sort, day NULLS LAST, created_at', [trip.id]),
+    await run(`SELECT ${ENTRY_COLS} FROM entries WHERE trip_id = $1 ORDER BY date DESC, created_at DESC`, [trip.id]),
+    await run(`SELECT ${PLACE_COLS} FROM places WHERE trip_id = $1 ORDER BY kind, sort, day NULLS LAST, created_at`, [trip.id]),
   ]);
   const { id: _id, ...publicTrip } = trip;
   const me = userId ? members.rows.find((m) => m.user_id === userId && !m.left_at) : null;
+  if (!me) {
+    // Not a member: only what the join screen needs. No phones, money, places or notes.
+    return {
+      preview: true,
+      trip: { code: trip.code, name: trip.name, destination: trip.destination, start_date: trip.start_date, end_date: trip.end_date, currency: trip.currency },
+      meId: null,
+      members: members.rows
+        .filter((m) => !m.left_at)
+        .map((m) => ({ id: m.id, name: m.name, color: m.color, role: m.role, claimed: m.user_id !== null, phone: '', left_at: null, avatar: null })),
+      entries: [],
+      places: [],
+      ledger: computeBalances([], [], null),
+      version: 0,
+    };
+  }
   return {
     trip: publicTrip,
     meId: me?.id ?? null,
@@ -178,6 +211,7 @@ app.get('/api/health', (_req, res) => res.json({ ok: true }));
 app.post(
   '/api/auth/signup',
   wrap(async (req, res) => {
+    useSystem();
     const phone = normalizePhone(req.body.phone);
     const name = str(req.body.name, 40);
     const password = typeof req.body.password === 'string' ? req.body.password : '';
@@ -201,6 +235,7 @@ app.post(
 app.post(
   '/api/auth/login',
   wrap(async (req, res) => {
+    useSystem();
     const phone = normalizePhone(req.body.phone);
     const password = typeof req.body.password === 'string' ? req.body.password : '';
     if (!phone) throw bad('Enter a valid phone number');
@@ -216,6 +251,7 @@ app.post(
 app.post(
   '/api/auth/logout',
   wrap(async (req, res) => {
+    useSystem();
     const header = req.get('authorization') ?? '';
     if (header.startsWith('Bearer ')) await query('DELETE FROM auth_sessions WHERE token_hash = $1', [hash(header.slice(7))]);
     res.json({ ok: true });
@@ -225,6 +261,7 @@ app.post(
 app.get(
   '/api/auth/me',
   wrap(async (req, res) => {
+    useSystem();
     const { is_admin, avatar_id, ...user } = await requireUser(req);
     res.json({ user: { ...user, isAdmin: is_admin, avatarId: avatar_id } });
   }),
@@ -234,6 +271,7 @@ app.get(
 app.get(
   '/api/me/trips',
   wrap(async (req, res) => {
+    useSystem();
     const user = await requireUser(req);
     const { rows: trips } = await query(
       `SELECT t.*, m.id AS member_id, m.role FROM trips t JOIN members m ON m.trip_id = t.id
@@ -269,6 +307,7 @@ app.get(
 app.post(
   '/api/trips',
   wrap(async (req, res) => {
+    useSystem();
     const user = await requireUser(req);
     const name = str(req.body.name, 80);
     if (!name) throw bad('Give the trip a name');
@@ -301,9 +340,12 @@ app.post(
 app.get(
   '/api/trips/:code',
   wrap(async (req, res) => {
-    const trip = await loadTrip(req.params.code);
-    if (req.query.v && Number(req.query.v) === trip.version) return res.json({ unchanged: true });
+    const trip = await loadTrip(req.params.code, req);
     const user = await currentUser(req);
+    if (req.query.v && Number(req.query.v) === trip.version && user) {
+      const { rows } = await query('SELECT 1 FROM members WHERE trip_id = $1 AND user_id = $2 AND left_at IS NULL', [trip.id, user.id]);
+      if (rows.length) return res.json({ unchanged: true });
+    }
     res.json(await state(trip, user?.id));
   }),
 );
@@ -312,7 +354,7 @@ app.get(
 app.post(
   '/api/trips/:code/join',
   wrap(async (req, res) => {
-    const trip = await loadTrip(req.params.code);
+    const trip = await loadTrip(req.params.code, req);
     const user = await requireUser(req);
     const memberId = await tx(async (run) => {
       const { rows: existing } = await run('SELECT id, left_at FROM members WHERE trip_id = $1 AND user_id = $2', [
@@ -350,7 +392,7 @@ app.post(
 app.patch(
   '/api/trips/:code',
   wrap(async (req, res) => {
-    const trip = await loadTrip(req.params.code);
+    const trip = await loadTrip(req.params.code, req);
     await auth(req, trip, { leader: true });
     const b = req.body;
     const next = {
@@ -378,7 +420,7 @@ app.patch(
 app.delete(
   '/api/trips/:code',
   wrap(async (req, res) => {
-    const trip = await loadTrip(req.params.code);
+    const trip = await loadTrip(req.params.code, req);
     await auth(req, trip, { leader: true });
     if (String(req.body?.confirm ?? '').toUpperCase() !== trip.code) throw bad('Type the trip code to confirm');
     await query('DELETE FROM trips WHERE id = $1', [trip.id]);
@@ -390,7 +432,7 @@ app.delete(
 app.post(
   '/api/trips/:code/members',
   wrap(async (req, res) => {
-    const trip = await loadTrip(req.params.code);
+    const trip = await loadTrip(req.params.code, req);
     await auth(req, trip, { leader: true });
     const name = str(req.body.name, 40);
     if (!name) throw bad('Add a name');
@@ -399,18 +441,17 @@ app.post(
     const phone = raw ? normalizePhone(raw) : '';
     if (raw && !phone) throw bad('That phone number does not look right');
     let linked = false;
+    // Look the account up first: no system query may run inside the tenant transaction.
+    const account = phone ? (await sys('SELECT id FROM users WHERE phone = $1', [phone])).rows[0] : null;
     await tx(async (run) => {
       await run(
         'INSERT INTO members (id, trip_id, name, phone, color) VALUES ($1, $2, $3, $4, $5)',
         [memberId, trip.id, name, phone, await nextColor(run, trip.id)],
       );
-      if (phone) {
-        const { rows } = await run('SELECT id FROM users WHERE phone = $1', [phone]);
-        if (rows[0]) {
-          await linkSeatsByPhone(run, rows[0].id, phone);
-          const { rows: r2 } = await run('SELECT user_id FROM members WHERE id = $1', [memberId]);
-          linked = !!r2[0]?.user_id;
-        }
+      if (account) {
+        await linkSeatsByPhone(run, account.id, phone);
+        const { rows } = await run('SELECT user_id FROM members WHERE id = $1', [memberId]);
+        linked = !!rows[0]?.user_id;
       }
       await bump(run, trip.id);
     });
@@ -421,7 +462,7 @@ app.post(
 app.patch(
   '/api/trips/:code/members/:id',
   wrap(async (req, res) => {
-    const trip = await loadTrip(req.params.code);
+    const trip = await loadTrip(req.params.code, req);
     const me = await auth(req, trip);
     const isLeader = me.role === 'leader';
     const self = me.id === req.params.id;
@@ -455,7 +496,7 @@ app.patch(
     );
     // A number added for an unclaimed seat may already belong to an account.
     if (!m.user_id && newPhone && newPhone !== m.phone) {
-      const { rows: acct } = await query('SELECT id FROM users WHERE phone = $1', [newPhone]);
+      const { rows: acct } = await sys('SELECT id FROM users WHERE phone = $1', [newPhone]);
       if (acct[0]) await linkSeatsByPhone(query, acct[0].id, newPhone);
     }
     await bump(query, trip.id);
@@ -466,7 +507,7 @@ app.patch(
 app.delete(
   '/api/trips/:code/members/:id',
   wrap(async (req, res) => {
-    const trip = await loadTrip(req.params.code);
+    const trip = await loadTrip(req.params.code, req);
     const me = await auth(req, trip, { leader: true });
     if (me.id === req.params.id) throw bad('Hand over leadership before removing yourself');
     const { rows } = await query(
@@ -537,7 +578,7 @@ async function parseEntry(body, trip) {
 app.post(
   '/api/trips/:code/entries',
   wrap(async (req, res) => {
-    const trip = await loadTrip(req.params.code);
+    const trip = await loadTrip(req.params.code, req);
     const me = await auth(req, trip);
     const e = await parseEntry(req.body, trip);
     const entryId = id();
@@ -567,7 +608,7 @@ async function ownEntry(req, trip) {
 app.put(
   '/api/trips/:code/entries/:id',
   wrap(async (req, res) => {
-    const trip = await loadTrip(req.params.code);
+    const trip = await loadTrip(req.params.code, req);
     const old = await ownEntry(req, trip);
     const e = await parseEntry({ ...req.body, kind: old.kind }, trip);
     await tx(async (run) => {
@@ -585,7 +626,7 @@ app.put(
 app.delete(
   '/api/trips/:code/entries/:id',
   wrap(async (req, res) => {
-    const trip = await loadTrip(req.params.code);
+    const trip = await loadTrip(req.params.code, req);
     const old = await ownEntry(req, trip);
     await tx(async (run) => {
       await run('DELETE FROM entries WHERE id = $1', [old.id]);
@@ -608,7 +649,7 @@ const parsePlace = (b) => {
 app.post(
   '/api/trips/:code/places',
   wrap(async (req, res) => {
-    const trip = await loadTrip(req.params.code);
+    const trip = await loadTrip(req.params.code, req);
     await auth(req, trip, { leader: true });
     const placeId = id();
     await tx(async (run) => {
@@ -625,7 +666,7 @@ app.post(
 app.put(
   '/api/trips/:code/places/:id',
   wrap(async (req, res) => {
-    const trip = await loadTrip(req.params.code);
+    const trip = await loadTrip(req.params.code, req);
     await auth(req, trip, { leader: true });
     await tx(async (run) => {
       await run(
@@ -641,7 +682,7 @@ app.put(
 app.delete(
   '/api/trips/:code/places/:id',
   wrap(async (req, res) => {
-    const trip = await loadTrip(req.params.code);
+    const trip = await loadTrip(req.params.code, req);
     await auth(req, trip, { leader: true });
     await tx(async (run) => {
       await run('DELETE FROM places WHERE id = $1 AND trip_id = $2', [req.params.id, trip.id]);
@@ -651,10 +692,10 @@ app.delete(
   }),
 );
 
-adminRoutes(app, { query, wrap, requireUser, HttpError, computeBalances });
-avatarRoutes(app, { query, tx, wrap, requireUser, HttpError, id });
+adminRoutes(app, { query, wrap, requireUser, HttpError, computeBalances, useSystem });
+avatarRoutes(app, { query, tx, wrap, requireUser, HttpError, id, useSystem, loadTrip });
 
 const port = Number(process.env.PORT) || 8787;
 await connect();
-await ensureAdmin({ query, id, normalizePhone, hashPassword });
+await ensureAdmin({ query: sys, id, normalizePhone, hashPassword });
 app.listen(port, () => console.log(`SajiloTrip API on :${port}`));

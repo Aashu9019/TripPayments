@@ -66,6 +66,8 @@ export interface Ledger {
 }
 
 export interface TripState {
+  /** True when you are not a member: only the join preview is sent. */
+  preview?: boolean;
   trip: Trip;
   /** Your member id in this trip, or null if you haven't joined. */
   meId: string | null;

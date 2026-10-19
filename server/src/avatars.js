@@ -5,7 +5,7 @@
 const MAX_BYTES = 200 * 1024;
 const TYPES = { 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/png': 'png' };
 
-export function avatarRoutes(app, { query, tx, wrap, requireUser, HttpError, id }) {
+export function avatarRoutes(app, { query, tx, wrap, requireUser, HttpError, id, useSystem, loadTrip }) {
   // Everyone sharing a trip with this user should pull fresh state.
   const bumpTrips = (run, userId) =>
     run('UPDATE trips SET version = version + 1 WHERE id IN (SELECT trip_id FROM members WHERE user_id = $1)', [userId]);
@@ -13,6 +13,7 @@ export function avatarRoutes(app, { query, tx, wrap, requireUser, HttpError, id 
   app.put(
     '/api/me/avatar',
     wrap(async (req, res) => {
+      useSystem();
       const user = await requireUser(req);
       const m = /^data:(image\/(?:jpeg|webp|png));base64,([A-Za-z0-9+/=]+)$/.exec(String(req.body.image ?? ''));
       if (!m || !TYPES[m[1]]) throw new HttpError(400, 'Send a JPEG, WebP or PNG image');
@@ -33,12 +34,9 @@ export function avatarRoutes(app, { query, tx, wrap, requireUser, HttpError, id 
   app.put(
     '/api/trips/:code/members/:id/avatar',
     wrap(async (req, res) => {
+      const trip = await loadTrip(req.params.code, req);
       const user = await requireUser(req);
-      const { rows } = await query(
-        `SELECT m.id, m.trip_id FROM members m JOIN trips t ON t.id = m.trip_id
-         WHERE t.code = $1 AND m.id = $2`,
-        [req.params.code.toUpperCase(), req.params.id],
-      );
+      const { rows } = await query('SELECT id, trip_id FROM members WHERE trip_id = $1 AND id = $2', [trip.id, req.params.id]);
       const target = rows[0];
       if (!target) throw new HttpError(404, 'Member not found');
       const { rows: lead } = await query(
@@ -67,6 +65,7 @@ export function avatarRoutes(app, { query, tx, wrap, requireUser, HttpError, id 
   app.delete(
     '/api/me/avatar',
     wrap(async (req, res) => {
+      useSystem();
       const user = await requireUser(req);
       await tx(async (run) => {
         await run('DELETE FROM avatars WHERE user_id = $1', [user.id]);
@@ -80,6 +79,7 @@ export function avatarRoutes(app, { query, tx, wrap, requireUser, HttpError, id 
   app.patch(
     '/api/me',
     wrap(async (req, res) => {
+      useSystem();
       const user = await requireUser(req);
       const name = typeof req.body.name === 'string' ? req.body.name.trim().slice(0, 40) : '';
       if (!name) throw new HttpError(400, 'Add your name');
@@ -95,6 +95,7 @@ export function avatarRoutes(app, { query, tx, wrap, requireUser, HttpError, id 
   app.get(
     '/api/avatars/:id',
     wrap(async (req, res) => {
+      useSystem();
       const { rows } = await query('SELECT mime, data FROM avatars WHERE id = $1', [req.params.id]);
       if (!rows[0]) throw new HttpError(404, 'No such photo');
       res.set('Content-Type', rows[0].mime);

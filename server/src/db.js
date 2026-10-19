@@ -1,4 +1,5 @@
 // Postgres in production (Render), PGlite locally when DATABASE_URL is unset.
+import { AsyncLocalStorage } from 'node:async_hooks';
 let impl;
 
 export async function connect() {
@@ -48,8 +49,68 @@ export async function connect() {
   await migrate();
 }
 
-export const query = (sql, params) => impl.query(sql, params);
-export const tx = (fn) => impl.tx(fn);
+// ---------- Tenant scoping (row-level security) ----------
+//
+// Every request runs inside a scope. A trip route declares its trip with
+// useTrip(id); global routes (auth, "my trips", admin) declare useSystem().
+// Each query then runs in a transaction that sets:
+//   app.trip_id  - the tenant; RLS policies only expose rows of this trip
+//   app.bypass   - 'on' only for system work
+// and, for tenant work, switches to the restricted sajilo_app role, which has
+// no BYPASSRLS. A request that declares nothing sees nothing (fails closed).
+
+const scope = new AsyncLocalStorage();
+
+/** Run a request handler in its own fresh scope. */
+export const inScope = (fn) => scope.run({ tripId: null, system: false }, fn);
+
+export function useTrip(tripId) {
+  const s = scope.getStore();
+  if (!s) throw new Error('useTrip outside a request scope');
+  s.tripId = tripId;
+  s.system = false;
+}
+
+export function useSystem() {
+  const s = scope.getStore();
+  if (!s) throw new Error('useSystem outside a request scope');
+  s.system = true;
+}
+
+const current = () => {
+  const s = scope.getStore();
+  return { tripId: s?.tripId ?? '', system: !!s?.system };
+};
+
+async function enter(run, { tripId, system }) {
+  if (!system) await run('SET LOCAL ROLE sajilo_app');
+  await run("SELECT set_config('app.trip_id', $1, true), set_config('app.bypass', $2, true)", [tripId, system ? 'on' : 'off']);
+}
+
+/** One statement, scoped to the current request's tenant. */
+export const query = (sql, params) => {
+  const c = current();
+  return impl.tx(async (run) => {
+    await enter(run, c);
+    return run(sql, params);
+  });
+};
+
+/** Several statements in one transaction, scoped to the current tenant. */
+export const tx = (fn) => {
+  const c = current();
+  return impl.tx(async (run) => {
+    await enter(run, c);
+    return fn(run);
+  });
+};
+
+/** Explicit system query (sign-in lookups, trip-code lookup). Never tenant-scoped. */
+export const sys = (sql, params) =>
+  impl.tx(async (run) => {
+    await enter(run, { tripId: '', system: true });
+    return run(sql, params);
+  });
 
 async function migrate() {
   const statements = [
@@ -136,4 +197,37 @@ async function migrate() {
     )`,
   ];
   for (const s of statements) await impl.query(s);
+  await enableRls();
+}
+
+const TENANT = "current_setting('app.trip_id', true)";
+const BYPASS = "current_setting('app.bypass', true) = 'on'";
+
+/** Row-level security: each trip is a tenant. Safe to run on every start. */
+async function enableRls() {
+  const policies = {
+    trips: `${BYPASS} OR id = ${TENANT}`,
+    members: `${BYPASS} OR trip_id = ${TENANT}`,
+    entries: `${BYPASS} OR trip_id = ${TENANT}`,
+    places: `${BYPASS} OR trip_id = ${TENANT}`,
+    // Photos a leader set for a seat in this trip; account photos are system-only.
+    avatars: `${BYPASS} OR EXISTS (SELECT 1 FROM members m WHERE m.id = avatars.member_id AND m.trip_id = ${TENANT})`,
+    // Inside a trip you may read the accounts of that trip's members (names, photos).
+    users: `${BYPASS} OR EXISTS (SELECT 1 FROM members m WHERE m.user_id = users.id AND m.trip_id = ${TENANT})`,
+    auth_sessions: BYPASS,
+  };
+  await impl.query(`DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sajilo_app') THEN
+        CREATE ROLE sajilo_app NOLOGIN NOBYPASSRLS;
+      END IF;
+    END $$`);
+  await impl.query('GRANT sajilo_app TO CURRENT_USER').catch(() => {}); // superusers already can SET ROLE
+  await impl.query('GRANT USAGE ON SCHEMA public TO sajilo_app');
+  await impl.query('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO sajilo_app');
+  for (const [table, rule] of Object.entries(policies)) {
+    await impl.query(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY`);
+    await impl.query(`ALTER TABLE ${table} FORCE ROW LEVEL SECURITY`);
+    await impl.query(`DROP POLICY IF EXISTS tenant ON ${table}`);
+    await impl.query(`CREATE POLICY tenant ON ${table} USING (${rule}) WITH CHECK (${rule})`);
+  }
 }
