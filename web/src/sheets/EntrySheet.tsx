@@ -34,7 +34,7 @@ export function EntrySheet({
   onOpenChange: (o: boolean) => void;
   draft: EntryDraft | null;
 }) {
-  const { data, me, isLeader, mutate, code } = useLoadedTrip();
+  const { data, me, isLeader, mutate, code, member } = useLoadedTrip();
   const active = data.members.filter((m) => !m.left_at);
   const editing = draft?.entry;
 
@@ -85,6 +85,19 @@ export function EntrySheet({
     setBusy(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, draft]);
+
+  // Pill rows scroll sideways: bring the preselected payer / receiver into view,
+  // otherwise someone far down the list looks unselected.
+  useEffect(() => {
+    if (!open) return;
+    const id = window.setTimeout(() => {
+      document.querySelectorAll<HTMLElement>('.sheet .chips [aria-checked="true"]').forEach((chip) => {
+        const row = chip.parentElement;
+        if (row) row.scrollTo({ left: chip.offsetLeft - row.clientWidth / 2 + chip.clientWidth / 2, behavior: 'smooth' });
+      });
+    }, 320);
+    return () => window.clearTimeout(id);
+  }, [open, draft, from, to, kind]);
 
   const total = parseMoney(amount);
   // Live shares: stored ones while editing untouched, otherwise typed + auto-filled.
@@ -303,6 +316,21 @@ export function EntrySheet({
         </div>
       )}
 
+      {kind === 'payment' && from && to && from !== FUND && (
+        <div className="pay-summary">
+          <span className="xfer-person">
+            <Avatar member={member(from)} />
+            <span>{from === me?.id ? 'You' : member(from)?.name.split(' ')[0]}</span>
+          </span>
+          <span className="pay-arrow" aria-hidden>
+            →
+          </span>
+          <span className="xfer-person">
+            <Avatar member={member(to)} />
+            <span>{to === me?.id ? 'You' : member(to)?.name.split(' ')[0]}</span>
+          </span>
+        </div>
+      )}
       <label className="amount-input">
         <span>{data.trip.currency === 'NPR' ? 'Rs' : data.trip.currency}</span>
         <input
