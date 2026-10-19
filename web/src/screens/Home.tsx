@@ -4,7 +4,7 @@ import { useLoadedTrip } from '../lib/trip-context';
 import { dateRange, money } from '../lib/format';
 import { Avatar, TopBar } from '../components/ui';
 import { EntryRow } from '../components/EntryRow';
-import { CategoryBar, FundBar } from '../components/charts';
+import { CategoryDonut, RingTile } from '../components/charts';
 import { TripTitle } from '../components/TripSwitcher';
 import { useOpenEntry, useOpenSwitcher } from './TripShell';
 import { shareInvite } from '../lib/share';
@@ -18,8 +18,8 @@ export function Home() {
   const myNet = me ? (ledger.net[me.id] ?? 0) : 0;
   const myShare = me ? (ledger.spent[me.id] ?? 0) : 0;
   const myMoves = ledger.transfers.filter((t) => t.from === me?.id || t.to === me?.id);
-  const people = data.members.filter((m) => !m.left_at || ledger.spent[m.id]);
-  const maxSpent = Math.max(1, ...people.map((m) => ledger.spent[m.id] ?? 0));
+  const keeper = member(ledger.fund.keeperId);
+  const empty = data.entries.length === 0;
 
   return (
     <>
@@ -36,104 +36,45 @@ export function Home() {
 
       <div className="cols">
         <div>
-          <section className="hero" aria-live="polite">
+          {/* 1. Your number, and what to do about it. */}
+          <section className={`balance-block ${myNet > 0 ? 'is-plus' : myNet < 0 ? 'is-minus' : ''}`} aria-live="polite">
             <div className="hero-label">{myNet > 0 ? 'You get back' : myNet < 0 ? 'You owe' : 'Your balance'}</div>
-            <p className={`hero-amount ${myNet > 0 ? 'plus' : myNet < 0 ? 'minus' : ''}`}>
-              {myNet === 0 ? 'All square' : money(Math.abs(myNet), cur)}
-            </p>
-            <div className="hero-pills num">
-              <span>
-                Your share <b>{money(myShare, cur)}</b>
-              </span>
-              <span>
-                Trip <b>{money(ledger.total, cur)}</b>
-              </span>
-            </div>
-          </section>
-
-          {myMoves.length > 0 && (
-            <ul className="transfers compact">
-              {myMoves.map((t) => {
-                const iPay = t.from === me?.id;
-                const other = member(iPay ? t.to : t.from);
-                return (
-                  <li key={`${t.from}-${t.to}`} data-mine="true">
-                    <div className="xfer-people">
-                      <span className="xfer-person">
-                        <Avatar member={iPay ? me : other} size="sm" />
-                        <span>{iPay ? 'You' : other?.name.split(' ')[0]}</span>
-                      </span>
-                      <span className="xfer-arrow" aria-hidden>
-                        <ArrowRight size={14} />
-                      </span>
-                      <span className="xfer-person">
-                        <Avatar member={iPay ? other : me} size="sm" />
-                        <span>{iPay ? other?.name.split(' ')[0] : 'You'}</span>
-                      </span>
-                    </div>
-                    <span className="xfer-amt num">{money(t.amount, cur)}</span>
-                    {iPay && (
-                      <button
-                        className="xfer-done"
-                        aria-label={`Mark paid to ${other?.name}`}
-                        onClick={() => open({ kind: 'payment', fromId: t.from, toId: t.to, amount: t.amount })}
-                      >
-                        <Check size={18} strokeWidth={2.4} />
-                      </button>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-
-          {ledger.total > 0 && (
-            <section className="section">
-              <div className="section-head">Where it went</div>
-              <CategoryBar entries={data.entries} currency={cur} />
-            </section>
-          )}
-
-          <FundBar fund={ledger.fund} keeper={member(ledger.fund.keeperId)} currency={cur} />
-
-          {ledger.total > 0 && (
-            <section className="section">
-              <div className="section-head">Each person’s share</div>
-              <ul className="share-bars">
-                {people.map((m) => {
-                  const s = ledger.spent[m.id] ?? 0;
+            <p className="hero-amount num">{myNet === 0 ? 'All square' : money(Math.abs(myNet), cur)}</p>
+            {myMoves.length > 0 && (
+              <ul className="moves-v2">
+                {myMoves.map((t) => {
+                  const iPay = t.from === me?.id;
+                  const other = member(iPay ? t.to : t.from);
                   return (
-                    <li key={m.id}>
-                      <Avatar member={m} size="sm" />
-                      <span className="bal-name">{m.id === me?.id ? 'You' : m.name.split(' ')[0]}</span>
-                      <span className="share-track" aria-hidden>
-                        <span style={{ width: `${(s / maxSpent) * 100}%`, background: `var(--m${m.color % 8})` }} />
+                    <li key={`${t.from}-${t.to}`}>
+                      <Avatar member={other} size="sm" />
+                      <span className="mv-text">
+                        {iPay ? (
+                          <>
+                            <ArrowRight size={13} /> {other?.name.split(' ')[0]}
+                          </>
+                        ) : (
+                          <>{other?.name.split(' ')[0]} pays you</>
+                        )}
                       </span>
-                      <span className="bal-amt num">{money(s, cur)}</span>
+                      <span className="mv-amt num">{money(t.amount, cur)}</span>
+                      {iPay && (
+                        <button
+                          className="mv-done"
+                          aria-label={`Mark paid to ${other?.name}`}
+                          onClick={() => open({ kind: 'payment', fromId: t.from, toId: t.to, amount: t.amount })}
+                        >
+                          <Check size={16} strokeWidth={2.6} />
+                        </button>
+                      )}
                     </li>
                   );
                 })}
               </ul>
-            </section>
-          )}
-        </div>
-
-        <section className="section">
-          <div className="section-head">
-            Recent
-            {data.entries.length > 5 && (
-              <Link to={`/t/${code}/spend`} className="link-btn">
-                See all
-              </Link>
             )}
-          </div>
-          {data.entries.length ? (
-            <ul className="list">
-              {data.entries.slice(0, 5).map((e) => (
-                <EntryRow key={e.id} entry={e} />
-              ))}
-            </ul>
-          ) : (
+          </section>
+
+          {empty ? (
             <div className="empty">
               <strong>Nothing spent yet</strong>
               <p>Pooled money first? Add it to the common fund.</p>
@@ -141,8 +82,48 @@ export function Home() {
                 Add to common fund
               </button>
             </div>
+          ) : (
+            <>
+              {/* 2. Where the money went. */}
+              {ledger.total > 0 && (
+                <section className="section">
+                  <div className="section-head">Where it went</div>
+                  <CategoryDonut entries={data.entries} currency={cur} />
+                </section>
+              )}
+
+              {/* 3. Two quick rings. */}
+              <div className="ring-row">
+                {ledger.fund.in > 0 && (
+                  <RingTile
+                    value={ledger.fund.cash}
+                    of={ledger.fund.in}
+                    color="var(--accent)"
+                    label={keeper && keeper.id !== me?.id ? `Fund left · ${keeper.name.split(' ')[0]}` : 'Fund left'}
+                    amount={money(ledger.fund.cash, cur)}
+                  />
+                )}
+                <RingTile value={myShare} of={ledger.total} color={`var(--m${(me?.color ?? 0) % 8})`} label="Your share" amount={money(myShare, cur)} />
+              </div>
+            </>
           )}
-        </section>
+        </div>
+
+        {!empty && (
+          <section className="section">
+            <div className="section-head">
+              Recent
+              <Link to={`/t/${code}/spend`} className="link-btn">
+                See all
+              </Link>
+            </div>
+            <ul className="list">
+              {data.entries.slice(0, 3).map((e) => (
+                <EntryRow key={e.id} entry={e} />
+              ))}
+            </ul>
+          </section>
+        )}
       </div>
     </>
   );

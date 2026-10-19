@@ -654,3 +654,222 @@
   min-width: 0;
   max-width: 100%;
 }
+
+/* ---------- Home v3: balance, donut, rings ---------- */
+
+.balance-block {
+  margin: 8px var(--gutter) 0;
+  padding: 18px 18px 16px;
+  border-radius: 20px;
+  background: var(--paper-2);
+}
+
+.balance-block.is-plus {
+  background: color-mix(in srgb, var(--plus) 12%, var(--paper));
+}
+
+.balance-block.is-minus {
+  background: color-mix(in srgb, var(--minus) 11%, var(--paper));
+}
+
+.balance-block.is-plus .hero-amount {
+  color: var(--plus);
+}
+
+.balance-block.is-minus .hero-amount {
+  color: var(--minus);
+}
+
+.moves-v2 {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 12px 0 0;
+  border-top: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+  display: grid;
+  gap: 8px;
+}
+
+.moves-v2 li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+}
+
+.mv-text {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+}
+
+.mv-amt {
+  font-weight: 600;
+}
+
+.mv-done {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  cursor: pointer;
+  transition: transform 140ms var(--ease-out);
+}
+
+.mv-done:active {
+  transform: scale(0.9);
+}
+
+.donut {
+  position: relative;
+  flex: none;
+}
+
+.donut svg {
+  transform: rotate(-90deg);
+}
+
+.donut-seg {
+  animation: donut-in 700ms var(--ease-out) both;
+}
+
+@keyframes donut-in {
+  from {
+    stroke-dasharray: 0 var(--c);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .donut-seg {
+    animation: none;
+  }
+}
+
+.donut-center {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  text-align: center;
+}
+
+.donut-big {
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.donut-small {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.cat-donut {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 4px var(--gutter) 0;
+}
+
+.donut-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 9px;
+}
+
+.donut-legend li {
+  display: grid;
+  grid-template-columns: 10px 1fr auto;
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  align-items: center;
+}
+
+.donut-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  grid-row: 1;
+}
+
+.dl-label {
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dl-pct {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.dl-amt {
+  grid-column: 2 / 4;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.ring-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin: 24px var(--gutter) 0;
+}
+
+.ring-tile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 16px;
+  background: var(--paper-2);
+}
+
+.ring-pct {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ring-text {
+  display: grid;
+  min-width: 0;
+}
+
+.ring-label {
+  font-size: 12px;
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ring-amt {
+  font-size: 16px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Very narrow phones: stack the donut over its legend. */
+@media (max-width: 359px) {
+  .cat-donut {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .cat-donut .donut {
+    align-self: center;
+  }
+}
