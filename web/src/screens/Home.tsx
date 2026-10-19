@@ -87,7 +87,7 @@ export function Home() {
               {/* 2. Where the money went. */}
               {ledger.total > 0 && (
                 <section className="section">
-                  <div className="section-head">Where it went</div>
+                  <div className="section-head">Where the trip money went</div>
                   <CategoryDonut entries={data.entries} currency={cur} />
                 </section>
               )}
@@ -100,7 +100,7 @@ export function Home() {
                     of={ledger.fund.in}
                     color="var(--accent)"
                     label={keeper && keeper.id !== me?.id ? `Fund left · ${keeper.name.split(' ')[0]}` : 'Fund left'}
-                    amount={money(ledger.fund.cash, cur)}
+                    amount={`${money(ledger.fund.cash, cur)} of ${money(ledger.fund.in, cur)}`}
                   />
                 )}
                 <RingTile value={myShare} of={ledger.total} color={`var(--m${(me?.color ?? 0) % 8})`} label="Your share" amount={money(myShare, cur)} />

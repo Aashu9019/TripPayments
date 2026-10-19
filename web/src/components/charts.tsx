@@ -59,7 +59,7 @@ export function FundBar({ fund, keeper, currency }: { fund: { in: number; out: n
       </div>
       <div className="fundbar-legend num">
         <span>
-          <i className="spent" /> Spent {money(fund.out, currency)}
+          <i className="spent" /> Fund spent {money(fund.out, currency)}
         </span>
         <span>
           <i className="left" /> Left {money(fund.cash, currency)}
@@ -170,7 +170,7 @@ export function CategoryDonut({ entries, currency }: { entries: Entry[]; currenc
     <div className="cat-donut">
       <Donut parts={parts.map((p) => ({ key: p.id, value: p.v, color: CAT_COLOR[p.id] }))}>
         <span className="donut-big num">{short(total)}</span>
-        <span className="donut-small">spent</span>
+        <span className="donut-small">trip total</span>
       </Donut>
       <ul className="donut-legend">
         {parts.map((p) => (
