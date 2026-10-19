@@ -8,6 +8,8 @@ export interface Member {
   color: number;
   claimed: boolean;
   left_at: string | null;
+  /** Profile photo id from the member's account, if they set one. */
+  avatar?: string | null;
 }
 
 export type EntryKind = 'expense' | 'deposit' | 'payment';
@@ -79,6 +81,7 @@ export interface User {
   phone: string;
   name: string;
   isAdmin?: boolean;
+  avatarId?: string | null;
 }
 
 /** A trip in the signed-in user's list, with their own balance. */

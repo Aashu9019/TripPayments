@@ -2,6 +2,7 @@ import { useEffect, useState, type FocusEvent, type ReactNode } from 'react';
 import { Drawer } from 'vaul';
 import { X, Wallet } from 'lucide-react';
 import { initials } from '../lib/format';
+import { avatarUrl } from '../lib/api';
 import type { Member } from '../lib/types';
 
 export function Avatar({ member, size }: { member?: Member | null; size?: 'sm' }) {
@@ -15,8 +16,16 @@ export function Avatar({ member, size }: { member?: Member | null; size?: 'sm' }
   return (
     <span className={`avatar ${size ?? ''}`} style={{ background: `var(--m${member.color % 8})` }} aria-hidden>
       {initials(member.name)}
+      {member.avatar && <AvatarPhoto id={member.avatar} />}
     </span>
   );
+}
+
+/** Photo laid over the initials; if it fails to load, the initials show through. */
+function AvatarPhoto({ id }: { id: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return null;
+  return <img className="avatar-img" src={avatarUrl(id)} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} />;
 }
 
 export function useMediaQuery(query: string) {

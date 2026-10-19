@@ -1,9 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { recent } from '../lib/api';
 import { useAuth } from '../lib/auth-context';
 import { TripList, useMyTrips } from '../components/TripSwitcher';
-import { Spinner } from '../components/ui';
+import { Avatar, Spinner } from '../components/ui';
+import { ProfileSheet } from '../components/ProfileSheet';
 
 // Opening the app (or the installed icon) jumps straight into the last trip,
 // but only once per launch, so "All trips" still shows this screen.
@@ -17,6 +18,7 @@ export function Landing() {
   const { user, signOut } = useAuth();
   const [params] = useSearchParams();
   const { trips, error } = useMyTrips();
+  const [profile, setProfile] = useState(false);
   useEffect(() => {
     launched = true;
   }, []);
@@ -36,6 +38,11 @@ export function Landing() {
           <button className="link-btn" style={{ marginLeft: 'auto', fontSize: 14 }} onClick={() => signOut()}>
             Sign out
           </button>
+          {user && (
+            <button className="person" onClick={() => setProfile(true)} aria-label="Your profile">
+              <Avatar member={{ id: user.id, name: user.name, color: 0, avatar: user.avatarId ?? null, role: 'member', phone: user.phone, claimed: true, left_at: null }} />
+            </button>
+          )}
         </div>
         <h1 style={{ marginBottom: 4 }}>Namaste, {user?.name.split(' ')[0]}</h1>
         <p className="lede">{trips?.length ? 'Your trips' : 'Start a trip for your group, or join one with a code.'}</p>
@@ -61,6 +68,7 @@ export function Landing() {
           </Link>
         </div>
       </main>
+      <ProfileSheet open={profile} onOpenChange={setProfile} />
     </div>
   );
 }

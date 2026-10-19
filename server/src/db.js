@@ -108,6 +108,14 @@ async function migrate() {
     )`,
     `ALTER TABLE members ADD COLUMN IF NOT EXISTS user_id TEXT REFERENCES users(id) ON DELETE SET NULL`,
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_id TEXT`,
+    `CREATE TABLE IF NOT EXISTS avatars (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      mime TEXT NOT NULL,
+      data BYTEA NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )`,
     `CREATE INDEX IF NOT EXISTS members_user_idx ON members(user_id)`,
     `CREATE INDEX IF NOT EXISTS entries_trip_idx ON entries(trip_id, date DESC)`,
     `CREATE TABLE IF NOT EXISTS places (

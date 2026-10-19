@@ -46,6 +46,8 @@ fewest payments needed to settle everyone.
 - Anyone can start a trip for any group; the creator is that trip's leader
 - Friends join with the invite link or 6-letter code and tap their name
 - Every member's number is one tap away (Call / WhatsApp)
+- Profile photo and name, set once and shown on every trip (photos are
+  cropped and compressed on the phone before upload)
 - The leader can add people, remove people (with confirmation), hand over
   leadership, or free up a seat. Removed people with payments keep their
   balance until it is settled

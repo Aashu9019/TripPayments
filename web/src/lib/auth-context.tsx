@@ -7,6 +7,8 @@ interface AuthCtx {
   user: User | null;
   signIn: (res: { token: string; user: User }) => void;
   signOut: () => Promise<void>;
+  /** Patch the signed-in user (after a profile change). */
+  updateUser: (patch: Partial<User>) => void;
 }
 
 const Ctx = createContext<AuthCtx | null>(null);
@@ -34,6 +36,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signIn: (res) => {
       auth.set(res);
       setUser(res.user);
+    },
+    updateUser: (patch) => {
+      const cur = auth.get();
+      if (!cur) return;
+      const next = { ...cur, user: { ...cur.user, ...patch } };
+      auth.set(next);
+      setUser(next.user);
     },
     signOut: async () => {
       await api.logout().catch(() => {});

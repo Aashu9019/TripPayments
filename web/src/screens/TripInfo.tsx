@@ -12,9 +12,11 @@ import { shareInvite } from '../lib/share';
 import type { Member, Place, PlaceKind } from '../lib/types';
 import { Avatar, TopBar } from '../components/ui';
 import { MemberSheet, PlaceSheet, TripEditSheet } from '../sheets/TripSheets';
+import { ProfileSheet } from '../components/ProfileSheet';
 
 export function TripInfo() {
-  const { data, me, isLeader, code, mutate } = useLoadedTrip();
+  const { data, me, isLeader, code, mutate, refresh } = useLoadedTrip();
+  const [profile, setProfile] = useState(false);
   const openSwitcher = useOpenSwitcher();
   const nav = useNavigate();
   const location = useLocation();
@@ -95,7 +97,7 @@ export function TripInfo() {
             const canEdit = isLeader || m.id === me?.id;
             return (
               <li key={m.id}>
-                <button className="person" onClick={() => canEdit && setMember({ member: m })} disabled={!canEdit} aria-label={m.name}>
+                <button className="person" onClick={() => (m.id === me?.id ? setProfile(true) : canEdit && setMember({ member: m }))} disabled={!canEdit} aria-label={m.name}>
                   <span className="person-avatar" data-pending={!m.claimed}>
                     <Avatar member={m} />
                     {m.role === 'leader' && <span className="crown" aria-label="Leader">★</span>}
@@ -203,6 +205,7 @@ export function TripInfo() {
       <PlaceSheet open={!!place} onOpenChange={(o) => !o && setPlace(null)} kind={place?.kind ?? 'stop'} place={place?.place} />
       <MemberSheet open={!!member} onOpenChange={(o) => !o && setMember(null)} member={member?.member} />
       <TripEditSheet open={editTrip} onOpenChange={setEditTrip} />
+      <ProfileSheet open={profile} onOpenChange={setProfile} onChanged={() => refresh().catch(() => {})} />
     </>
   );
 }

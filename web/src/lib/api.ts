@@ -76,7 +76,12 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 const t = (code: string) => `/trips/${encodeURIComponent(code.toUpperCase())}`;
 type AuthRes = { token: string; user: User };
 
+export const avatarUrl = (id: string) => `${BASE}/api/avatars/${id}`;
+
 export const api = {
+  setAvatar: (image: string) => request<{ avatarId: string }>('PUT', '/me/avatar', { image }),
+  removeAvatar: () => request('DELETE', '/me/avatar'),
+  updateMe: (body: { name: string }) => request('PATCH', '/me', body),
   signup: (body: { phone: string; name: string; password: string }) => request<AuthRes>('POST', '/auth/signup', body),
   login: (body: { phone: string; password: string }) => request<AuthRes>('POST', '/auth/login', body),
   logout: () => request('POST', '/auth/logout', {}),

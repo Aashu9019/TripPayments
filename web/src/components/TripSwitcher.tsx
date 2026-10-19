@@ -5,8 +5,9 @@ import { api, cache } from '../lib/api';
 import { useAuth } from '../lib/auth-context';
 import { dateRange, money } from '../lib/format';
 import type { MyTrip } from '../lib/types';
-import { Sheet, Spinner } from './ui';
+import { Avatar, Sheet, Spinner } from './ui';
 import { formatPhone } from './ContactButtons';
+import { ProfileSheet } from './ProfileSheet';
 
 /** The signed-in user's trips: cached copy first, then fresh from the server. */
 export function useMyTrips(active = true) {
@@ -62,6 +63,7 @@ export function TripSwitcher({ open, onOpenChange, current }: { open: boolean; o
   const nav = useNavigate();
   const { user, signOut } = useAuth();
   const { trips } = useMyTrips(open);
+  const [profile, setProfile] = useState(false);
   const go = (to: string) => {
     onOpenChange(false);
     nav(to);
@@ -76,6 +78,17 @@ export function TripSwitcher({ open, onOpenChange, current }: { open: boolean; o
         </div>
       )}
       <ul className="list" style={{ marginTop: 16 }}>
+        {user && (
+          <li>
+            <button className="row" onClick={() => setProfile(true)}>
+              <Avatar member={{ id: user.id, name: user.name, color: 0, avatar: user.avatarId ?? null, role: 'member', phone: user.phone, claimed: true, left_at: null }} />
+              <div className="row-main">
+                <div className="row-title">{user.name}</div>
+                <div className="row-sub">Your profile · photo and name</div>
+              </div>
+            </button>
+          </li>
+        )}
         <li>
           <button className="row" onClick={() => go('/new')}>
             <span className="glyph">
@@ -112,6 +125,7 @@ export function TripSwitcher({ open, onOpenChange, current }: { open: boolean; o
           </button>
         </li>
       </ul>
+      <ProfileSheet open={profile} onOpenChange={setProfile} />
     </Sheet>
   );
 }

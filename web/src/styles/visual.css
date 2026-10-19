@@ -556,3 +556,68 @@
 .people-strip > li {
   align-content: start;
 }
+
+/* ---------- Profile photos ---------- */
+
+.avatar {
+  position: relative;
+  overflow: hidden;
+}
+
+.avatar-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+.profile-photo {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  padding: 8px var(--gutter) 24px;
+}
+
+.profile-avatar {
+  position: relative;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  transition: transform 140ms var(--ease-out);
+}
+
+.profile-avatar:active {
+  transform: scale(0.96);
+}
+
+.profile-avatar .avatar {
+  width: 104px;
+  height: 104px;
+  font-size: 34px;
+}
+
+.profile-cam {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 3px solid var(--paper);
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.profile-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.wordmark .person {
+  margin-left: 12px;
+}

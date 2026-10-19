@@ -4,12 +4,13 @@ import crypto from 'node:crypto';
 import { connect, query, tx } from './db.js';
 import { computeBalances, equalShares } from './ledger.js';
 import { adminRoutes, ensureAdmin } from './admin.js';
+import { avatarRoutes } from './avatars.js';
 
 const app = express();
 app.set('trust proxy', 1); // Render sits behind a proxy; needed for per-IP login throttling
 const origins = (process.env.CORS_ORIGIN ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 app.use(cors({ origin: origins.length ? origins : true }));
-app.use(express.json({ limit: '64kb' }));
+app.use(express.json({ limit: '400kb' })); // room for one compressed profile photo
 
 const id = () => crypto.randomUUID();
 const hash = (t) => crypto.createHash('sha256').update(t).digest('hex');
@@ -86,7 +87,7 @@ async function currentUser(req) {
   const token = header.startsWith('Bearer ') ? header.slice(7) : '';
   if (!token) return null;
   const { rows } = await query(
-    'SELECT u.id, u.phone, u.name, u.is_admin FROM auth_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1',
+    'SELECT u.id, u.phone, u.name, u.is_admin, u.avatar_id FROM auth_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1',
     [hash(token)],
   );
   return rows[0] ?? null;
@@ -133,8 +134,8 @@ async function nextColor(run, tripId) {
 async function state(trip, userId = null) {
   const [members, entries, places] = await Promise.all([
     query(
-      `SELECT id, name, role, phone, color, left_at, created_at, user_id
-       FROM members WHERE trip_id = $1 ORDER BY created_at`,
+      `SELECT m.id, m.name, m.role, m.phone, m.color, m.left_at, m.created_at, m.user_id, u.avatar_id AS avatar
+       FROM members m LEFT JOIN users u ON u.id = m.user_id WHERE m.trip_id = $1 ORDER BY m.created_at`,
       [trip.id],
     ),
     query('SELECT * FROM entries WHERE trip_id = $1 ORDER BY date DESC, created_at DESC', [trip.id]),
@@ -187,7 +188,7 @@ app.post(
     const { rows } = await query('SELECT * FROM users WHERE phone = $1', [phone]);
     const user = rows[0];
     if (!user || !(await checkPassword(password, user.pass_hash))) throw new HttpError(401, 'Wrong phone number or password');
-    res.json({ token: await newSession(user.id), user: { id: user.id, phone: user.phone, name: user.name, isAdmin: user.is_admin } });
+    res.json({ token: await newSession(user.id), user: { id: user.id, phone: user.phone, name: user.name, isAdmin: user.is_admin, avatarId: user.avatar_id } });
   }),
 );
 
@@ -203,8 +204,8 @@ app.post(
 app.get(
   '/api/auth/me',
   wrap(async (req, res) => {
-    const { is_admin, ...user } = await requireUser(req);
-    res.json({ user: { ...user, isAdmin: is_admin } });
+    const { is_admin, avatar_id, ...user } = await requireUser(req);
+    res.json({ user: { ...user, isAdmin: is_admin, avatarId: avatar_id } });
   }),
 );
 
@@ -599,6 +600,7 @@ app.delete(
 );
 
 adminRoutes(app, { query, wrap, requireUser, HttpError, computeBalances });
+avatarRoutes(app, { query, tx, wrap, requireUser, HttpError, id });
 
 const port = Number(process.env.PORT) || 8787;
 await connect();

@@ -12,6 +12,10 @@ normalised to `+<country><number>`; bare 10-digit Nepali mobiles get +977.
 | POST | `/auth/logout` | signed in | ends this session |
 | GET | `/auth/me` | signed in | `{user}` |
 | GET | `/me/trips` | signed in | your trips with your balance in each |
+| PATCH | `/me` | signed in | `name` (also renames your trip seats) |
+| PUT | `/me/avatar` | signed in | `image` as a JPEG/WebP/PNG data URL, max 200 KB → `{avatarId}` |
+| DELETE | `/me/avatar` | signed in | removes your photo |
+| GET | `/avatars/:id` | anyone | the photo, cached for a year (ids change on every upload) |
 | POST | `/trips` | signed in | `name, destination?, startDate?, endDate?` → `{code}`; you become leader |
 | GET | `/trips/:code?v=N` | anyone with code | full state incl. `meId` when signed in, or `{unchanged:true}` |
 | POST | `/trips/:code/join` | signed in | `memberId` (claim a seat) or nothing (join as yourself) → `{memberId}` |
