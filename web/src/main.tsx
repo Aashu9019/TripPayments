@@ -6,6 +6,9 @@ import { App } from './App';
 import { AuthProvider } from './lib/auth-context';
 import './styles/app.css';
 import './styles/visual.css';
+import { setupPwa } from './lib/pwa';
+
+setupPwa();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

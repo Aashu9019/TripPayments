@@ -7,6 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: false, // registered in src/lib/pwa.ts so it can check for updates on resume
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
       manifest: {
         name: 'SajiloTrip — trip money',
