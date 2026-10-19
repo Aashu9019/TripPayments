@@ -45,6 +45,11 @@ fewest payments needed to settle everyone.
   balance in each; switch trips from the trip name at the top
 - Anyone can start a trip for any group; the creator is that trip's leader
 - Friends join with the invite link or 6-letter code and tap their name
+- If the leader adds a friend with their phone number, that friend is linked
+  automatically when they create an account (or sign in) with the same
+  number; everyone always chooses their own password
+- The leader can set a photo for anyone they added (the person's own
+  profile photo takes over once they set one)
 - Every member's number is one tap away (Call / WhatsApp)
 - Profile photo and name, set once and shown on every trip (photos are
   cropped and compressed on the phone before upload)

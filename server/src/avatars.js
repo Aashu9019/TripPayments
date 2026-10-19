@@ -29,6 +29,41 @@ export function avatarRoutes(app, { query, tx, wrap, requireUser, HttpError, id 
     }),
   );
 
+  // Trip leader sets a photo for someone on the trip (shown until they set their own).
+  app.put(
+    '/api/trips/:code/members/:id/avatar',
+    wrap(async (req, res) => {
+      const user = await requireUser(req);
+      const { rows } = await query(
+        `SELECT m.id, m.trip_id FROM members m JOIN trips t ON t.id = m.trip_id
+         WHERE t.code = $1 AND m.id = $2`,
+        [req.params.code.toUpperCase(), req.params.id],
+      );
+      const target = rows[0];
+      if (!target) throw new HttpError(404, 'Member not found');
+      const { rows: lead } = await query(
+        "SELECT 1 FROM members WHERE trip_id = $1 AND user_id = $2 AND role = 'leader' AND left_at IS NULL",
+        [target.trip_id, user.id],
+      );
+      if (!lead.length) throw new HttpError(403, 'Only the trip leader can do that');
+      const m = /^data:(image\/(?:jpeg|webp|png));base64,([A-Za-z0-9+/=]+)$/.exec(String(req.body.image ?? ''));
+      const remove = req.body.image === null;
+      if (!remove && (!m || !TYPES[m[1]])) throw new HttpError(400, 'Send a JPEG, WebP or PNG image');
+      const data = remove ? null : Buffer.from(m[2], 'base64');
+      if (data && data.length > MAX_BYTES) throw new HttpError(413, 'Photo is too large');
+      const avatarId = remove ? null : id();
+      await tx(async (run) => {
+        await run('DELETE FROM avatars WHERE member_id = $1', [target.id]);
+        if (!remove) {
+          await run('INSERT INTO avatars (id, member_id, mime, data) VALUES ($1, $2, $3, $4)', [avatarId, target.id, m[1], data]);
+        }
+        await run('UPDATE members SET avatar_id = $1 WHERE id = $2', [avatarId, target.id]);
+        await run('UPDATE trips SET version = version + 1 WHERE id = $1', [target.trip_id]);
+      });
+      res.json({ avatarId });
+    }),
+  );
+
   app.delete(
     '/api/me/avatar',
     wrap(async (req, res) => {

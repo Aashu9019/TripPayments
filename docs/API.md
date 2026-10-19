@@ -15,12 +15,13 @@ normalised to `+<country><number>`; bare 10-digit Nepali mobiles get +977.
 | PATCH | `/me` | signed in | `name` (also renames your trip seats) |
 | PUT | `/me/avatar` | signed in | `image` as a JPEG/WebP/PNG data URL, max 200 KB → `{avatarId}` |
 | DELETE | `/me/avatar` | signed in | removes your photo |
+| PUT | `/trips/:code/members/:id/avatar` | leader | `image` data URL, or `null` to remove; shown until the person sets their own |
 | GET | `/avatars/:id` | anyone | the photo, cached for a year (ids change on every upload) |
 | POST | `/trips` | signed in | `name, destination?, startDate?, endDate?` → `{code}`; you become leader |
 | GET | `/trips/:code?v=N` | anyone with code | full state incl. `meId` when signed in, or `{unchanged:true}` |
 | POST | `/trips/:code/join` | signed in | `memberId` (claim a seat) or nothing (join as yourself) → `{memberId}` |
 | PATCH | `/trips/:code` | leader | `name, destination, startDate, endDate, notes, fundKeeperId` |
-| POST | `/trips/:code/members` | leader | `name, phone?` |
+| POST | `/trips/:code/members` | leader | `name, phone?` → `{id, linked}`; a phone that already has an account links the seat at once |
 | PATCH | `/trips/:code/members/:id` | leader or self | `name, phone, release` (free seat), `makeLeader, left` |
 | DELETE | `/trips/:code/members/:id` | leader | only if no entries reference them |
 | POST | `/trips/:code/entries` | member | see below |

@@ -124,6 +124,25 @@ function throttle(key) {
   if (++a.n > 10) throw new HttpError(429, 'Too many tries. Wait a few minutes.');
 }
 
+/**
+ * Seats the leader added with this phone number, not yet claimed, become the
+ * account's seats. One seat per trip; trips the account is already on are skipped.
+ */
+async function linkSeatsByPhone(run, userId, phone) {
+  if (!phone) return;
+  const { rows } = await run(
+    `SELECT DISTINCT ON (m.trip_id) m.id, m.trip_id FROM members m
+     WHERE m.phone = $1 AND m.user_id IS NULL AND m.left_at IS NULL
+       AND NOT EXISTS (SELECT 1 FROM members x WHERE x.trip_id = m.trip_id AND x.user_id = $2)
+     ORDER BY m.trip_id, m.created_at`,
+    [phone, userId],
+  );
+  for (const r of rows) {
+    await run('UPDATE members SET user_id = $1 WHERE id = $2', [userId, r.id]);
+    await run('UPDATE trips SET version = version + 1 WHERE id = $1', [r.trip_id]);
+  }
+}
+
 const bump = (run, tripId) => run('UPDATE trips SET version = version + 1 WHERE id = $1', [tripId]);
 
 async function nextColor(run, tripId) {
@@ -134,7 +153,7 @@ async function nextColor(run, tripId) {
 async function state(trip, userId = null) {
   const [members, entries, places] = await Promise.all([
     query(
-      `SELECT m.id, m.name, m.role, m.phone, m.color, m.left_at, m.created_at, m.user_id, u.avatar_id AS avatar
+      `SELECT m.id, m.name, m.role, m.phone, m.color, m.left_at, m.created_at, m.user_id, COALESCE(u.avatar_id, m.avatar_id) AS avatar
        FROM members m LEFT JOIN users u ON u.id = m.user_id WHERE m.trip_id = $1 ORDER BY m.created_at`,
       [trip.id],
     ),
@@ -174,6 +193,7 @@ app.post(
       name,
       await hashPassword(password),
     ]);
+    await linkSeatsByPhone(query, userId, phone);
     res.status(201).json({ token: await newSession(userId), user: { id: userId, phone, name, isAdmin: false } });
   }),
 );
@@ -188,6 +208,7 @@ app.post(
     const { rows } = await query('SELECT * FROM users WHERE phone = $1', [phone]);
     const user = rows[0];
     if (!user || !(await checkPassword(password, user.pass_hash))) throw new HttpError(401, 'Wrong phone number or password');
+    await linkSeatsByPhone(query, user.id, user.phone);
     res.json({ token: await newSession(user.id), user: { id: user.id, phone: user.phone, name: user.name, isAdmin: user.is_admin, avatarId: user.avatar_id } });
   }),
 );
@@ -374,14 +395,26 @@ app.post(
     const name = str(req.body.name, 40);
     if (!name) throw bad('Add a name');
     const memberId = id();
+    const raw = str(req.body.phone, 30);
+    const phone = raw ? normalizePhone(raw) : '';
+    if (raw && !phone) throw bad('That phone number does not look right');
+    let linked = false;
     await tx(async (run) => {
       await run(
         'INSERT INTO members (id, trip_id, name, phone, color) VALUES ($1, $2, $3, $4, $5)',
-        [memberId, trip.id, name, str(req.body.phone, 30), await nextColor(run, trip.id)],
+        [memberId, trip.id, name, phone, await nextColor(run, trip.id)],
       );
+      if (phone) {
+        const { rows } = await run('SELECT id FROM users WHERE phone = $1', [phone]);
+        if (rows[0]) {
+          await linkSeatsByPhone(run, rows[0].id, phone);
+          const { rows: r2 } = await run('SELECT user_id FROM members WHERE id = $1', [memberId]);
+          linked = !!r2[0]?.user_id;
+        }
+      }
       await bump(run, trip.id);
     });
-    res.status(201).json({ id: memberId });
+    res.status(201).json({ id: memberId, linked });
   }),
 );
 
@@ -403,6 +436,8 @@ app.patch(
       await query("UPDATE members SET role = 'member' WHERE id = $1", [me.id]);
       role = 'leader';
     }
+    const rawPhone = b.phone !== undefined ? str(b.phone, 30) : null;
+    const newPhone = rawPhone === null ? m.phone : rawPhone ? (normalizePhone(rawPhone) ?? rawPhone) : '';
     await query(
       `UPDATE members SET name=$1, phone=$2, role=$3,
          user_id = CASE WHEN $4 THEN NULL ELSE user_id END,
@@ -410,7 +445,7 @@ app.patch(
        WHERE id = $7`,
       [
         b.name !== undefined ? str(b.name, 40) || m.name : m.name,
-        b.phone !== undefined ? str(b.phone, 30) : m.phone,
+        newPhone,
         role,
         Boolean(b.release && isLeader && !self),
         Boolean(b.left === true && m.role !== 'leader'),
@@ -418,6 +453,11 @@ app.patch(
         m.id,
       ],
     );
+    // A number added for an unclaimed seat may already belong to an account.
+    if (!m.user_id && newPhone && newPhone !== m.phone) {
+      const { rows: acct } = await query('SELECT id FROM users WHERE phone = $1', [newPhone]);
+      if (acct[0]) await linkSeatsByPhone(query, acct[0].id, newPhone);
+    }
     await bump(query, trip.id);
     res.json({ ok: true });
   }),

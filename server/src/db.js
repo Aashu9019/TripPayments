@@ -116,6 +116,10 @@ async function migrate() {
       data BYTEA NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )`,
+    `ALTER TABLE members ADD COLUMN IF NOT EXISTS avatar_id TEXT`,
+    `ALTER TABLE avatars ALTER COLUMN user_id DROP NOT NULL`,
+    `ALTER TABLE avatars ADD COLUMN IF NOT EXISTS member_id TEXT REFERENCES members(id) ON DELETE CASCADE`,
+    `CREATE INDEX IF NOT EXISTS members_phone_idx ON members(phone) WHERE user_id IS NULL`,
     `CREATE INDEX IF NOT EXISTS members_user_idx ON members(user_id)`,
     `CREATE INDEX IF NOT EXISTS entries_trip_idx ON entries(trip_id, date DESC)`,
     `CREATE TABLE IF NOT EXISTS places (

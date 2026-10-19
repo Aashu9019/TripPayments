@@ -24,7 +24,13 @@ export function Login() {
     try {
       signIn(mode === 'signup' ? await api.signup({ phone, name, password }) : await api.login({ phone, password }));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not sign in');
+      if (err instanceof ApiError && err.status === 401 && mode === 'signin') {
+        setError('Wrong number or password. First time here? Tap Create account and choose your own password.');
+      } else if (err instanceof ApiError && err.status === 409 && mode === 'signup') {
+        setError('This number already has an account. Tap Sign in.');
+      } else {
+        setError(err instanceof ApiError ? err.message : 'Could not sign in');
+      }
       setBusy(false);
     }
   }

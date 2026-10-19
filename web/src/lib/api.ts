@@ -95,9 +95,11 @@ export const api = {
   updateTrip: (code: string, body: Record<string, unknown>) => request('PATCH', t(code), body),
   deleteTrip: (code: string, confirm: string) => request('DELETE', t(code), { confirm }),
   addMember: (code: string, body: { name: string; phone?: string }) =>
-    request<{ id: string }>('POST', `${t(code)}/members`, body),
+    request<{ id: string; linked: boolean }>('POST', `${t(code)}/members`, body),
   updateMember: (code: string, id: string, body: Record<string, unknown>) =>
     request('PATCH', `${t(code)}/members/${id}`, body),
+  setMemberAvatar: (code: string, id: string, image: string | null) =>
+    request<{ avatarId: string | null }>('PUT', `${t(code)}/members/${id}/avatar`, { image }),
   removeMember: (code: string, id: string) => request('DELETE', `${t(code)}/members/${id}`),
   addEntry: (code: string, body: Record<string, unknown>) => request<{ id: string }>('POST', `${t(code)}/entries`, body),
   updateEntry: (code: string, id: string, body: Record<string, unknown>) =>

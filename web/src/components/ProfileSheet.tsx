@@ -11,7 +11,7 @@ import { setCalendar } from '../lib/dates';
 const SIZE = 256;
 
 /** Center-crop to a square and compress, so uploads stay ~15 KB on mobile data. */
-async function toSquareJpeg(file: File): Promise<string> {
+export async function toSquareJpeg(file: File): Promise<string> {
   const url = URL.createObjectURL(file);
   try {
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {

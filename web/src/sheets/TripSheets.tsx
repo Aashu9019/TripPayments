@@ -6,7 +6,10 @@ import { toast } from 'sonner';
 import { api, ApiError } from '../lib/api';
 import { useLoadedTrip } from '../lib/trip-context';
 import type { Member, Place, PlaceKind } from '../lib/types';
-import { FINE_POINTER, Sheet } from '../components/ui';
+import { Avatar, FINE_POINTER, Sheet } from '../components/ui';
+import { toSquareJpeg } from '../components/ProfileSheet';
+import { Camera } from 'lucide-react';
+import { useRef } from 'react';
 
 const PLACE_COPY: Record<PlaceKind, { add: string; title: string; placeholder: string }> = {
   stop: { add: 'Add route stop', title: 'Place', placeholder: 'Ringmo village' },
@@ -129,10 +132,14 @@ export function MemberSheet({
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [busy, setBusy] = useState(false);
+  // Photo the leader picked: a data URL waiting to upload, or null to remove.
+  const [photo, setPhoto] = useState<string | null | undefined>(undefined);
+  const fileRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (open) {
       setName(member?.name ?? '');
       setPhone(member?.phone ?? '');
+      setPhoto(undefined);
     }
   }, [open, member]);
   const self = member?.id === me?.id;
@@ -152,8 +159,38 @@ export function MemberSheet({
 
   const save = () => {
     if (!name.trim()) return toast.error('Add a name');
-    return run(() => (member ? api.updateMember(code, member.id, { name, phone }) : api.addMember(code, { name, phone })));
+    return run(async () => {
+      let id = member?.id;
+      let linked = false;
+      if (member) await api.updateMember(code, member.id, { name, phone });
+      else {
+        const res = await api.addMember(code, { name, phone });
+        id = res.id;
+        linked = res.linked;
+      }
+      if (id && photo !== undefined && isLeader) await api.setMemberAvatar(code, id, photo);
+      if (linked) toast.success(`${name} already has an account, so the trip is in their list now`);
+    });
   };
+
+  async function pickPhoto(file: File | undefined) {
+    if (!file) return;
+    try {
+      setPhoto(await toSquareJpeg(file));
+    } catch (e) {
+      toast.error((e as Error).message || 'Could not read that image');
+    } finally {
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  }
+
+  // What the avatar shows right now, including an unsaved pick.
+  const previewMember = {
+    ...(member ?? { id: 'new', role: 'member' as const, color: data.members.length % 8, claimed: false, left_at: null, phone }),
+    name: name || 'New friend',
+    avatar: photo === null ? null : (member?.avatar ?? null),
+  };
+  const canPhoto = isLeader && !self;
 
   return (
     <Sheet
@@ -166,6 +203,28 @@ export function MemberSheet({
         </button>
       }
     >
+      {canPhoto && (
+        <div className="profile-photo" style={{ paddingBottom: 12 }}>
+          <button className="profile-avatar" onClick={() => fileRef.current?.click()} aria-label="Set photo">
+            {typeof photo === 'string' ? (
+              <span className="avatar" style={{ width: 88, height: 88 }}>
+                <img className="avatar-img" src={photo} alt="" />
+              </span>
+            ) : (
+              <Avatar member={previewMember} />
+            )}
+            <span className="profile-cam" aria-hidden>
+              <Camera size={16} />
+            </span>
+          </button>
+          {(typeof photo === 'string' || (photo === undefined && member?.avatar)) && (
+            <button className="link-btn" onClick={() => setPhoto(null)}>
+              Remove photo
+            </button>
+          )}
+          <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => pickPhoto(e.target.files?.[0])} />
+        </div>
+      )}
       <label className="field">
         <span>Name</span>
         <input className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={40} autoFocus={!member && FINE_POINTER} placeholder="Asha" />
@@ -174,7 +233,11 @@ export function MemberSheet({
         <span>Phone</span>
         <input className="input" type="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={30} placeholder="Optional" />
       </label>
-      {!member && <p className="hint">They'll pick their name when they open the invite link.</p>}
+      {(!member || !member.claimed) && (
+        <p className="hint">
+          Add their number and they’re linked automatically when they sign up or sign in with it. Otherwise they pick their name from the invite link.
+        </p>
+      )}
 
       {member && isLeader && !self && (
         <div className="pad stack-gap" style={{ marginTop: 8 }}>
