@@ -873,3 +873,38 @@
     align-self: center;
   }
 }
+
+/* ---------- BS date picker ---------- */
+
+.bs-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.5fr) minmax(0, 1.1fr) auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.bs-picker select.input {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 0 28px 0 12px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--ink-3) 50%), linear-gradient(135deg, var(--ink-3) 50%, transparent 50%);
+  background-position: calc(100% - 15px) 21px, calc(100% - 10px) 21px;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  font-variant-numeric: tabular-nums;
+}
+
+.bs-picker .bs-clear {
+  margin: 0;
+}
+
+/* .bs-picker has 4 columns; without the clear button, let year take the slot. */
+.bs-picker:not(:has(.bs-clear)) {
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.5fr) minmax(0, 1.1fr);
+}
+
+.date-empty {
+  text-align: left;
+  color: var(--ink-3);
+  cursor: pointer;
+}

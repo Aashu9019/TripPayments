@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { DateField } from '../components/DateField';
 import { toast } from 'sonner';
 import { api, ApiError } from '../lib/api';
 import { useLoadedTrip } from '../lib/trip-context';
@@ -277,11 +278,8 @@ export function EntrySheet({
         </>
       )}
 
-      <div className="two-up" style={{ marginTop: 16 }}>
-        <label className="field">
-          <span>Date</span>
-          <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        </label>
+      <div style={{ marginTop: 16 }}>
+        <DateField label="Date" value={date} onChange={setDate} />
         <label className="field">
           <span>Note</span>
           <input className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional" maxLength={500} />

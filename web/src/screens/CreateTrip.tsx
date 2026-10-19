@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { DateField } from '../components/DateField';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
 import { api, ApiError } from '../lib/api';
@@ -42,16 +43,8 @@ export function CreateTrip() {
             <span>Where to</span>
             <input className="input" value={form.destination} onChange={set('destination')} placeholder="Dolpa" maxLength={120} />
           </label>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
-            <label className="field" style={{ paddingRight: 6 }}>
-              <span>From</span>
-              <input className="input" type="date" value={form.startDate} onChange={set('startDate')} />
-            </label>
-            <label className="field" style={{ paddingLeft: 6 }}>
-              <span>To</span>
-              <input className="input" type="date" value={form.endDate} min={form.startDate || undefined} onChange={set('endDate')} />
-            </label>
-          </div>
+          <DateField label="From" value={form.startDate} onChange={(v) => setForm((f) => ({ ...f, startDate: v }))} optional />
+          <DateField label="To" value={form.endDate} onChange={(v) => setForm((f) => ({ ...f, endDate: v }))} optional />
           <p className="hint">You'll be the trip leader. You can add friends and hand over leadership later.</p>
           {error && <p className="form-error" role="alert">{error}</p>}
           <div className="pad">

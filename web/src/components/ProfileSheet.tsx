@@ -5,6 +5,8 @@ import { api, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth-context';
 import { Avatar, Sheet } from './ui';
 import { formatPhone } from './ContactButtons';
+import { useCalendar } from './DateField';
+import { setCalendar } from '../lib/dates';
 
 const SIZE = 256;
 
@@ -36,6 +38,7 @@ export function ProfileSheet({ open, onOpenChange, onChanged }: { open: boolean;
   const fileRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
+  const cal = useCalendar();
 
   useEffect(() => {
     if (open && user) setName(user.name);
@@ -124,6 +127,15 @@ export function ProfileSheet({ open, onOpenChange, onChanged }: { open: boolean;
         <input className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={40} />
       </label>
       <p className="hint">{formatPhone(user.phone)} · your friends see this name and photo on every trip.</p>
+      <div className="field-label">Dates</div>
+      <div className="segmented" role="radiogroup" aria-label="Calendar">
+        <button role="radio" aria-checked={cal === 'bs'} onClick={() => setCalendar('bs')}>
+          Nepali (BS)
+        </button>
+        <button role="radio" aria-checked={cal === 'ad'} onClick={() => setCalendar('ad')}>
+          English (AD)
+        </button>
+      </div>
     </Sheet>
   );
 }

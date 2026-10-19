@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { DateField } from '../components/DateField';
 import { useNavigate } from 'react-router-dom';
 import { Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -294,16 +295,8 @@ export function TripEditSheet({ open, onOpenChange }: { open: boolean; onOpenCha
         <span>Where to</span>
         <input className="input" value={f.destination} onChange={set('destination')} maxLength={120} />
       </label>
-      <div className="two-up">
-        <label className="field">
-          <span>From</span>
-          <input className="input" type="date" value={f.startDate} onChange={set('startDate')} />
-        </label>
-        <label className="field">
-          <span>To</span>
-          <input className="input" type="date" value={f.endDate} onChange={set('endDate')} />
-        </label>
-      </div>
+      <DateField label="From" value={f.startDate} onChange={(v) => setF((x) => ({ ...x, startDate: v }))} optional />
+      <DateField label="To" value={f.endDate} onChange={(v) => setF((x) => ({ ...x, endDate: v }))} optional />
       <label className="field">
         <span>Notes for everyone</span>
         <textarea className="input" value={f.notes} onChange={set('notes')} maxLength={4000} placeholder="Permits, packing list, meeting point…" rows={5} />

@@ -1,3 +1,4 @@
+import { rangeLabel, weekdayDate } from './dates';
 const SYMBOL: Record<string, string> = { NPR: 'Rs', INR: '₹', USD: '$', EUR: '€' };
 
 const grouping = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2, minimumFractionDigits: 0 });
@@ -26,7 +27,7 @@ export function today() {
   return d.toISOString().slice(0, 10);
 }
 
-const dayFmt = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+/** Day header: "Today", "Yesterday", or "Mon, 2 Kartik" (BS or AD per setting). */
 export function dayLabel(iso: string) {
   const key = iso.slice(0, 10);
   if (key === today()) return 'Today';
@@ -34,15 +35,11 @@ export function dayLabel(iso: string) {
   y.setDate(y.getDate() - 1);
   y.setMinutes(y.getMinutes() - y.getTimezoneOffset());
   if (key === y.toISOString().slice(0, 10)) return 'Yesterday';
-  return dayFmt.format(new Date(`${key}T00:00:00`));
+  return weekdayDate(key);
 }
 
-const rangeFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
 export function dateRange(start: string | null, end: string | null) {
-  if (!start) return '';
-  const s = rangeFmt.format(new Date(`${start.slice(0, 10)}T00:00:00`));
-  if (!end) return s;
-  return `${s} – ${rangeFmt.format(new Date(`${end.slice(0, 10)}T00:00:00`))}`;
+  return rangeLabel(start?.slice(0, 10) ?? null, end?.slice(0, 10) ?? null);
 }
 
 export const initials = (name: string) =>

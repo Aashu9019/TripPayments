@@ -64,6 +64,9 @@ fewest payments needed to settle everyone.
 - Installable PWA (Android, iPhone, desktop)
 - Phone layout with bottom tabs and swipe-down sheets; desktop layout with a
   sidebar and side panels
+- Nepali (Bikram Sambat) dates by default: day headers, trip dates and
+  date pickers in BS; switch to English (AD) in Your profile. Dates are
+  stored as AD, so switching never changes data
 - Light and dark mode
 - Offline reading of the last synced trip
 

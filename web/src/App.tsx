@@ -6,9 +6,11 @@ import { Login } from './screens/Login';
 import { CreateTrip } from './screens/CreateTrip';
 import { JoinTrip } from './screens/JoinTrip';
 import { TripShell } from './screens/TripShell';
+import { useCalendar } from './components/DateField';
 
 export function App() {
   const location = useLocation();
+  useCalendar(); // re-render every date when BS/AD is switched
   // Key top-level screens so each push replays the slide-in; tabs inside a trip share one key.
   const top = location.pathname.split('/').slice(0, 3).join('/');
   return (
