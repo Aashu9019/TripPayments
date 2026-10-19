@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { DateField } from '../components/DateField';
+import { autoSplit, equalShares, maxFor } from '../lib/split';
 import { toast } from 'sonner';
+import { Search } from 'lucide-react';
 import { api, ApiError } from '../lib/api';
 import { useLoadedTrip } from '../lib/trip-context';
 import { CATEGORIES, money, parseMoney, toInput, today } from '../lib/format';
@@ -44,7 +46,14 @@ export function EntrySheet({
   const [to, setTo] = useState<string>('');
   const [participants, setParticipants] = useState<string[]>([]);
   const [exact, setExact] = useState(false);
-  const [shares, setShares] = useState<Record<string, string>>({});
+  // Uneven split: amounts the person typed (paisa). Everyone else shares the rest.
+  const [typed, setTyped] = useState<Record<string, number>>({});
+  // Stored shares of an expense being edited, shown as-is until something changes.
+  const [base, setBase] = useState<Record<string, number> | null>(null);
+  // Raw text of the field being typed in, so "10." survives while typing.
+  const [draftText, setDraftText] = useState<{ id: string; text: string } | null>(null);
+  const [capped, setCapped] = useState<string | null>(null);
+  const [who, setWho] = useState(''); // search in the split list (big groups)
   const [date, setDate] = useState(today());
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
@@ -62,7 +71,11 @@ export function EntrySheet({
     setTo(e?.to_id ?? draft.toId ?? '');
     setParticipants(e?.kind === 'expense' ? Object.keys(e.shares) : active.map((m) => m.id));
     setExact(e?.split_mode === 'exact');
-    setShares(e ? Object.fromEntries(Object.entries(e.shares).map(([k, v]) => [k, toInput(v)])) : {});
+    setTyped({});
+    setBase(e?.split_mode === 'exact' ? { ...e.shares } : null);
+    setDraftText(null);
+    setCapped(null);
+    setWho('');
     setDate(e?.date.slice(0, 10) ?? today());
     setNote(e?.note ?? '');
     setError('');
@@ -71,11 +84,68 @@ export function EntrySheet({
   }, [open, draft]);
 
   const total = parseMoney(amount);
-  const exactSum = useMemo(
-    () => Object.values(shares).reduce((s, v) => s + (parseMoney(v) ?? 0), 0),
-    [shares],
+  // Live shares: stored ones while editing untouched, otherwise typed + auto-filled.
+  const shares = useMemo(
+    () => base ?? (exact ? autoSplit(total ?? 0, participants, typed) : equalShares(total ?? 0, participants)),
+    [base, exact, total, participants, typed],
   );
-  const perHead = total && participants.length ? Math.floor(total / participants.length) : 0;
+  const assigned = participants.reduce((s, id) => s + (shares[id] ?? 0), 0);
+  const left = (total ?? 0) - assigned;
+
+  // Editing a stored split: the first change starts fresh, so everyone you don't
+  // type for re-spreads what is left.
+  const current = () => {
+    if (!base) return typed;
+    setBase(null);
+    return {};
+  };
+
+  function typeShare(id: string, text: string) {
+    const clean = text.replace(/[^\d.]/g, '');
+    const next: Record<string, number> = { ...current() };
+    delete next[id];
+    if (clean === '' || clean === '.') {
+      // Cleared: this person goes back to sharing the rest.
+      setTyped(next);
+      setDraftText({ id, text: clean });
+      setCapped(null);
+      return;
+    }
+    const max = maxFor(id, total ?? 0, participants, next);
+    let v = Math.round(Number(clean) * 100);
+    if (v > max) {
+      v = max;
+      setCapped(id);
+      setDraftText({ id, text: toInput(max) });
+    } else {
+      setCapped(null);
+      setDraftText({ id, text: clean });
+    }
+    setTyped({ ...next, [id]: v });
+  }
+
+  function toggleSplit(id: string) {
+    const next: Record<string, number> = { ...current() };
+    const on = participants.includes(id);
+    setParticipants((p) => (on ? p.filter((x) => x !== id) : [...p, id]));
+    if (on) delete next[id];
+    setTyped(next);
+    setCapped(null);
+  }
+
+  function selectAll(all: boolean) {
+    setBase(null);
+    setTyped({});
+    setCapped(null);
+    setParticipants(all ? active.map((m) => m.id) : []);
+  }
+
+  function resetSplit() {
+    setBase(null);
+    setTyped({});
+    setDraftText(null);
+    setCapped(null);
+  }
 
   const canDelete = editing && (isLeader || editing.created_by === me?.id);
 
@@ -83,8 +153,11 @@ export function EntrySheet({
     if (!total) return 'Enter an amount';
     if (kind === 'expense') {
       if (!title.trim()) return 'What was it for?';
-      if (exact && exactSum !== total) return `Split adds up to ${money(exactSum, data.trip.currency)}, not ${money(total, data.trip.currency)}`;
-      if (!exact && !participants.length) return 'Pick at least one person';
+      if (!participants.length) return 'Pick at least one person';
+      if (exact && left !== 0)
+        return left > 0
+          ? `${money(left, data.trip.currency)} still to assign`
+          : `Split is ${money(-left, data.trip.currency)} over the total`;
     }
     if (kind !== 'expense' && (!from || from === FUND)) return 'Pick who paid';
     if (kind === 'payment' && (!to || to === from)) return 'Pick who received it';
@@ -107,7 +180,7 @@ export function EntrySheet({
       note,
       splitMode: exact ? 'exact' : 'equal',
       participants,
-      shares: exact ? Object.fromEntries(Object.entries(shares).map(([k, v]) => [k, parseMoney(v) ?? 0])) : undefined,
+      shares: exact ? Object.fromEntries(participants.map((id) => [id, shares[id] ?? 0])) : undefined,
     };
     try {
       await mutate(() => (editing ? api.updateEntry(code, editing.id, body) : api.addEntry(code, body)));
@@ -132,8 +205,11 @@ export function EntrySheet({
     }
   }
 
-  const toggle = (id: string) =>
-    setParticipants((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+
+  // You first, then everyone else; the search box filters by name.
+  const ordered = [...active].sort((a, b) => (a.id === me?.id ? -1 : b.id === me?.id ? 1 : 0));
+  const q = who.trim().toLowerCase();
+  const splitList = q ? ordered.filter((m) => m.name.toLowerCase().includes(q)) : ordered;
 
   const title_ = editing ? `Edit ${KIND_LABEL[kind].toLowerCase()}` : 'Add';
 
@@ -201,7 +277,7 @@ export function EntrySheet({
             <Avatar size="sm" /> Common fund
           </button>
         )}
-        {active.map((m) => (
+        {ordered.map((m) => (
           <button key={m.id} className="chip" role="radio" aria-checked={from === m.id} onClick={() => setFrom(m.id)}>
             <Avatar member={m} size="sm" /> {m.id === me?.id ? 'You' : m.name}
           </button>
@@ -212,7 +288,7 @@ export function EntrySheet({
         <>
           <div className="field-label">Paid to</div>
           <div className="chips" role="radiogroup" aria-label="Paid to">
-            {active
+            {ordered
               .filter((m) => m.id !== from)
               .map((m) => (
                 <button key={m.id} className="chip" role="radio" aria-checked={to === m.id} onClick={() => setTo(m.id)}>
@@ -226,54 +302,93 @@ export function EntrySheet({
       {kind === 'expense' && (
         <>
           <div className="field-label split-head">
-            <span>Split between</span>
-            <button className="link-btn" onClick={() => setExact((x) => !x)}>
-              {exact ? 'Split equally' : 'Split unevenly'}
-            </button>
+            <span>
+              Split between{' '}
+              <span className="faint num">
+                · {participants.length === active.length ? `everyone (${active.length})` : `${participants.length} of ${active.length}`}
+              </span>
+            </span>
+            <span style={{ display: 'flex', gap: 14 }}>
+              {exact && (typed && Object.keys(typed).length > 0 || base) && (
+                <button className="link-btn" onClick={resetSplit}>
+                  Reset
+                </button>
+              )}
+              <button
+                className="link-btn"
+                onClick={() => {
+                  setExact((x) => !x);
+                  resetSplit();
+                }}
+              >
+                {exact ? 'Split equally' : 'Split unevenly'}
+              </button>
+            </span>
           </div>
-          {exact ? (
-            <>
-              {active.map((m) => (
-                <label key={m.id} className="split-row">
+          {active.length > 6 && (
+            <div className="split-tools">
+              <label className="split-search">
+                <Search size={16} aria-hidden />
+                <input
+                  type="search"
+                  placeholder="Find a person"
+                  value={who}
+                  onChange={(e) => setWho(e.target.value)}
+                  aria-label="Find a person to split with"
+                />
+              </label>
+              <button className="chip" onClick={() => selectAll(true)} aria-pressed={participants.length === active.length}>
+                All
+              </button>
+              <button className="chip" onClick={() => selectAll(false)} aria-pressed={participants.length === 0}>
+                None
+              </button>
+            </div>
+          )}
+          {splitList.length === 0 && <p className="hint">No one called “{who}”.</p>}
+          {splitList.map((m) => {
+            const on = participants.includes(m.id);
+            const isTyped = !base && m.id in typed;
+            const shown =
+              draftText?.id === m.id ? draftText.text : on ? toInput(shares[m.id] ?? 0) : '';
+            return (
+              <div key={m.id} className="split-row" data-off={!on}>
+                <button className="split-toggle" onClick={() => toggleSplit(m.id)} aria-pressed={on} aria-label={`${on ? 'Remove' : 'Add'} ${m.name}`}>
+                  <Check on={on} />
                   <Avatar member={m} size="sm" />
                   <span className="row-main">{m.name}</span>
+                </button>
+                {exact ? (
                   <input
-                    className="input num"
+                    className={`input num split-amt ${isTyped ? 'is-typed' : ''} ${capped === m.id ? 'is-capped' : ''}`}
                     inputMode="decimal"
                     placeholder="0"
-                    value={shares[m.id] ?? ''}
-                    onChange={(e) => setShares({ ...shares, [m.id]: e.target.value.replace(/[^\d.,]/g, '') })}
+                    disabled={!on || !total}
+                    value={shown}
+                    onFocus={() => setDraftText({ id: m.id, text: on && (isTyped || base) ? toInput(shares[m.id] ?? 0) : '' })}
+                    onBlur={() => setDraftText(null)}
+                    onChange={(e) => typeShare(m.id, e.target.value)}
+                    aria-label={`${m.name} share`}
                   />
-                </label>
-              ))}
-              <p className="hint num" style={{ marginTop: 4 }}>
-                {total ? (
-                  exactSum === total ? (
-                    'Adds up.'
-                  ) : (
-                    <>
-                      {money(Math.abs(total - exactSum), data.trip.currency)} {exactSum < total ? 'left to assign' : 'over'}
-                    </>
-                  )
                 ) : (
-                  'Enter the total first.'
+                  <span className="num muted">{on && total ? money(shares[m.id] ?? 0, data.trip.currency) : ''}</span>
                 )}
-              </p>
-            </>
-          ) : (
-            <>
-              {active.map((m) => {
-                const on = participants.includes(m.id);
-                return (
-                  <button key={m.id} className="split-row as-button" onClick={() => toggle(m.id)} aria-pressed={on}>
-                    <Check on={on} />
-                    <Avatar member={m} size="sm" />
-                    <span className="row-main">{m.name}</span>
-                    <span className="num muted">{on && perHead ? money(perHead, data.trip.currency) : ''}</span>
-                  </button>
-                );
-              })}
-            </>
+              </div>
+            );
+          })}
+          {exact && (
+            <div className="split-summary num">
+              {!total ? (
+                <span className="faint">Enter the total first</span>
+              ) : left === 0 ? (
+                <span className="plus">✓ Adds up to {money(total, data.trip.currency)}</span>
+              ) : left > 0 ? (
+                <span className="minus">{money(left, data.trip.currency)} left to assign</span>
+              ) : (
+                <span className="minus">{money(-left, data.trip.currency)} over the total</span>
+              )}
+              {capped && <span className="faint"> · capped at what’s left</span>}
+            </div>
           )}
         </>
       )}
