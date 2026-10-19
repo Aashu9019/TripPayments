@@ -53,7 +53,9 @@ export function EntrySheet({
   // Raw text of the field being typed in, so "10." survives while typing.
   const [draftText, setDraftText] = useState<{ id: string; text: string } | null>(null);
   const [capped, setCapped] = useState<string | null>(null);
-  const [who, setWho] = useState(''); // search in the split list (big groups)
+  const [who, setWho] = useState(''); // search in the people picker
+  // The sheet swaps between the form and a full-height people picker (no nested sheets on iPhone).
+  const [view, setView] = useState<'form' | 'people'>('form');
   const [date, setDate] = useState(today());
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
@@ -76,6 +78,7 @@ export function EntrySheet({
     setDraftText(null);
     setCapped(null);
     setWho('');
+    setView('form');
     setDate(e?.date.slice(0, 10) ?? today());
     setNote(e?.note ?? '');
     setError('');
@@ -217,8 +220,20 @@ export function EntrySheet({
     <Sheet
       open={open}
       onOpenChange={onOpenChange}
-      title={title_}
+      title={view === 'people' ? 'Split between' : title_}
       footer={
+        view === 'people' ? (
+          <button
+            className="btn"
+            onClick={() => {
+              setWho('');
+              setView('form');
+            }}
+            disabled={!participants.length}
+          >
+            {participants.length ? `Done · ${participants.length} ${participants.length === 1 ? 'person' : 'people'}` : 'Pick at least one'}
+          </button>
+        ) : (
         <>
           {canDelete && (
             <button className="btn danger" onClick={remove} disabled={busy} style={{ flex: 'none' }}>
@@ -229,8 +244,55 @@ export function EntrySheet({
             {busy ? 'Saving…' : editing ? 'Save' : kind === 'payment' ? 'Record payment' : 'Add'}
           </button>
         </>
+        )
       }
     >
+      {view === 'people' ? (
+        <div className="picker">
+          <div className="picker-top">
+            <label className="split-search">
+              <Search size={18} aria-hidden />
+              <input
+                type="search"
+                enterKeyHint="search"
+                placeholder={`Search ${active.length} people`}
+                value={who}
+                onChange={(e) => setWho(e.target.value)}
+                aria-label="Search people"
+              />
+            </label>
+            <div className="picker-bar">
+              <span className="faint num">
+                {participants.length} of {active.length} selected
+              </span>
+              <span style={{ display: 'flex', gap: 8 }}>
+                <button className="chip" onClick={() => selectAll(true)} aria-pressed={participants.length === active.length}>
+                  All
+                </button>
+                <button className="chip" onClick={() => selectAll(false)} aria-pressed={participants.length === 0}>
+                  None
+                </button>
+              </span>
+            </div>
+          </div>
+          {splitList.length === 0 && <p className="hint" style={{ marginTop: 16 }}>No one called “{who}”.</p>}
+          <ul className="picker-list">
+            {splitList.map((m) => {
+              const on = participants.includes(m.id);
+              return (
+                <li key={m.id}>
+                  <button className="picker-row" onClick={() => toggleSplit(m.id)} aria-pressed={on}>
+                    <Avatar member={m} />
+                    <span className="row-main">{m.id === me?.id ? `${m.name} (you)` : m.name}</span>
+                    <Check on={on} />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : (
+      <>
       {!editing && (
         <div className="segmented" role="radiogroup" aria-label="Type">
           {(Object.keys(KIND_LABEL) as EntryKind[]).map((k) => (
@@ -303,10 +365,7 @@ export function EntrySheet({
         <>
           <div className="field-label split-head">
             <span>
-              Split between{' '}
-              <span className="faint num">
-                · {participants.length === active.length ? `everyone (${active.length})` : `${participants.length} of ${active.length}`}
-              </span>
+              Split between
             </span>
             <span style={{ display: 'flex', gap: 14 }}>
               {exact && (typed && Object.keys(typed).length > 0 || base) && (
@@ -325,57 +384,58 @@ export function EntrySheet({
               </button>
             </span>
           </div>
-          {active.length > 6 && (
-            <div className="split-tools">
-              <label className="split-search">
-                <Search size={16} aria-hidden />
-                <input
-                  type="search"
-                  placeholder="Find a person"
-                  value={who}
-                  onChange={(e) => setWho(e.target.value)}
-                  aria-label="Find a person to split with"
-                />
-              </label>
-              <button className="chip" onClick={() => selectAll(true)} aria-pressed={participants.length === active.length}>
-                All
-              </button>
-              <button className="chip" onClick={() => selectAll(false)} aria-pressed={participants.length === 0}>
-                None
-              </button>
-            </div>
-          )}
-          {splitList.length === 0 && <p className="hint">No one called “{who}”.</p>}
-          {splitList.map((m) => {
-            const on = participants.includes(m.id);
-            const isTyped = !base && m.id in typed;
-            const shown =
-              draftText?.id === m.id ? draftText.text : on ? toInput(shares[m.id] ?? 0) : '';
-            return (
-              <div key={m.id} className="split-row" data-off={!on}>
-                <button className="split-toggle" onClick={() => toggleSplit(m.id)} aria-pressed={on} aria-label={`${on ? 'Remove' : 'Add'} ${m.name}`}>
-                  <Check on={on} />
-                  <Avatar member={m} size="sm" />
-                  <span className="row-main">{m.name}</span>
-                </button>
-                {exact ? (
-                  <input
-                    className={`input num split-amt ${isTyped ? 'is-typed' : ''} ${capped === m.id ? 'is-capped' : ''}`}
-                    inputMode="decimal"
-                    placeholder="0"
-                    disabled={!on || !total}
-                    value={shown}
-                    onFocus={() => setDraftText({ id: m.id, text: on && (isTyped || base) ? toInput(shares[m.id] ?? 0) : '' })}
-                    onBlur={() => setDraftText(null)}
-                    onChange={(e) => typeShare(m.id, e.target.value)}
-                    aria-label={`${m.name} share`}
-                  />
-                ) : (
-                  <span className="num muted">{on && total ? money(shares[m.id] ?? 0, data.trip.currency) : ''}</span>
-                )}
-              </div>
-            );
-          })}
+          <button className="who-row" onClick={() => setView('people')}>
+            <span className="avatar-stack" aria-hidden>
+              {ordered
+                .filter((m) => participants.includes(m.id))
+                .slice(0, 5)
+                .map((m) => (
+                  <Avatar key={m.id} member={m} size="sm" />
+                ))}
+              {participants.length > 5 && <span className="stack-more num">+{participants.length - 5}</span>}
+            </span>
+            <span className="row-main">
+              <span className="row-title">
+                {participants.length === 0
+                  ? 'Choose people'
+                  : participants.length === active.length
+                    ? `Everyone (${active.length})`
+                    : `${participants.length} ${participants.length === 1 ? 'person' : 'people'}`}
+              </span>
+              {!exact && total && participants.length > 0 && (
+                <span className="row-sub num">
+                  {Object.values(shares).every((v) => v === shares[participants[0]!])
+                    ? `${money(shares[participants[0]!] ?? 0, data.trip.currency)} each`
+                    : `about ${money(Math.round(total / participants.length / 100) * 100, data.trip.currency)} each`}
+                </span>
+              )}
+            </span>
+            <span className="link-btn">Change</span>
+          </button>
+          {exact &&
+            ordered
+              .filter((m) => participants.includes(m.id))
+              .map((m) => {
+                const isTyped = !base && m.id in typed;
+                const shown = draftText?.id === m.id ? draftText.text : toInput(shares[m.id] ?? 0);
+                return (
+                  <div key={m.id} className="split-row">
+                    <Avatar member={m} size="sm" />
+                    <span className="row-main">{m.id === me?.id ? 'You' : m.name}</span>
+                    <input
+                      className={`input num split-amt ${isTyped ? 'is-typed' : ''} ${capped === m.id ? 'is-capped' : ''}`}
+                      inputMode="decimal"
+                      placeholder="0"
+                      disabled={!total}
+                      value={shown}
+                      onFocus={() => setDraftText({ id: m.id, text: isTyped || base ? toInput(shares[m.id] ?? 0) : '' })}
+                      onBlur={() => setDraftText(null)}
+                      onChange={(e) => typeShare(m.id, e.target.value)}
+                      aria-label={`${m.name} share`}
+                    />
+                  </div>
+                );
+              })}
           {exact && (
             <div className="split-summary num">
               {!total ? (
@@ -404,6 +464,8 @@ export function EntrySheet({
         <p className="form-error" role="alert">
           {error}
         </p>
+      )}
+      </>
       )}
     </Sheet>
   );
