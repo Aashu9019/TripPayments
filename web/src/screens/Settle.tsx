@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Check, CircleCheck, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLoadedTrip } from '../lib/trip-context';
 import { money } from '../lib/format';
 import { api, ApiError } from '../lib/api';
 import { Avatar, Sheet, TopBar } from '../components/ui';
+import { BalanceChart, FundBar } from '../components/charts';
 import { useOpenEntry } from './TripShell';
 
 export function Settle() {
@@ -13,17 +14,14 @@ export function Settle() {
   const [keeperOpen, setKeeperOpen] = useState(false);
   const { ledger, trip } = data;
   const cur = trip.currency;
-  const keeper = member(ledger.fund.keeperId);
-  const name = (id: string) => (id === me?.id ? 'You' : (member(id)?.name ?? '—'));
-  const balances = data.members
-    .filter((m) => !m.left_at || ledger.net[m.id])
-    .sort((a, b) => (ledger.net[b.id] ?? 0) - (ledger.net[a.id] ?? 0));
+  const first = (id: string) => (id === me?.id ? 'You' : (member(id)?.name.split(' ')[0] ?? '—'));
+  // People who left only show while money is still open with them.
+  const people = data.members.filter((m) => !m.left_at || ledger.net[m.id]);
 
   async function setKeeper(id: string) {
     try {
       await mutate(() => api.updateTrip(code, { fundKeeperId: id }));
       setKeeperOpen(false);
-      toast.success('Fund keeper changed');
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : 'Could not change keeper');
     }
@@ -37,107 +35,63 @@ export function Settle() {
 
       <div className="cols">
         <div>
-          <section className="section" style={{ paddingTop: 8 }}>
-            <div className="section-head">
-              {ledger.transfers.length ? `${ledger.transfers.length} ${ledger.transfers.length === 1 ? 'payment' : 'payments'} settles everyone` : 'Payments'}
-            </div>
-            {ledger.transfers.length ? (
-              <ul className="list">
-                {ledger.transfers.map((t) => (
-                  <li key={`${t.from}-${t.to}`} className="row">
-                    <Avatar member={member(t.from)} size="sm" />
-                    <ArrowRight size={14} className="faint" />
-                    <Avatar member={member(t.to)} size="sm" />
-                    <div className="row-main">
-                      <div className="row-title">
-                        {name(t.from)} → {name(t.to)}
-                      </div>
-                      <div className="row-sub num">{money(t.amount, cur)}</div>
-                    </div>
-                    <button className="btn small ghost" onClick={() => open({ kind: 'payment', fromId: t.from, toId: t.to, amount: t.amount })}>
-                      Mark paid
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <div className="empty">
-                <strong>Everyone is square</strong>
-                <p>{ledger.total ? 'No one owes anything right now.' : 'Balances show up once you add expenses.'}</p>
-              </div>
-            )}
-            {ledger.transfers.length > 0 && (
-              <p className="hint" style={{ marginTop: 10 }}>
-                Paid some other way? Record any amount with Settle up from the + button.
-              </p>
-            )}
-          </section>
-
-          <section className="section">
-            <div className="section-head">Balances</div>
-            <ul className="list">
-              {balances.map((m) => {
-                const n = ledger.net[m.id] ?? 0;
+          {ledger.transfers.length ? (
+            <ul className="transfers">
+              {ledger.transfers.map((t) => {
+                const mine = t.from === me?.id || t.to === me?.id;
                 return (
-                  <li key={m.id} className="row">
-                    <Avatar member={m} />
-                    <div className="row-main">
-                      <div className="row-title">{m.id === me?.id ? `${m.name} (you)` : m.name}</div>
-                      <div className="row-sub num">
-                        paid {money((ledger.paid[m.id] ?? 0) + (ledger.deposited[m.id] ?? 0), cur)} · share {money(ledger.spent[m.id] ?? 0, cur)}
-                      </div>
+                  <li key={`${t.from}-${t.to}`} data-mine={mine}>
+                    <div className="xfer-people">
+                      <span className="xfer-person">
+                        <Avatar member={member(t.from)} />
+                        <span>{first(t.from)}</span>
+                      </span>
+                      <span className="xfer-arrow" aria-hidden>
+                        <ArrowRight size={16} />
+                      </span>
+                      <span className="xfer-person">
+                        <Avatar member={member(t.to)} />
+                        <span>{first(t.to)}</span>
+                      </span>
                     </div>
-                    <div className={`row-end row-title ${n > 0 ? 'plus' : n < 0 ? 'minus' : 'faint'}`}>
-                      {n === 0 ? 'square' : money(n, cur, { sign: true })}
-                    </div>
+                    <span className="xfer-amt num">{money(t.amount, cur)}</span>
+                    <button
+                      className="xfer-done"
+                      aria-label={`Mark ${first(t.from)} paid ${first(t.to)} ${money(t.amount, cur)}`}
+                      onClick={() => open({ kind: 'payment', fromId: t.from, toId: t.to, amount: t.amount })}
+                    >
+                      <Check size={18} strokeWidth={2.4} />
+                    </button>
                   </li>
                 );
               })}
             </ul>
+          ) : (
+            <div className="square">
+              <CircleCheck size={40} strokeWidth={1.6} />
+              <strong>All square</strong>
+            </div>
+          )}
+
+          <section className="section">
+            <div className="section-head">Balances</div>
+            <BalanceChart members={people} net={ledger.net} currency={cur} meId={me?.id} />
           </section>
         </div>
 
         <section className="section">
-          <div className="section-head">
-            Common fund
-            {isLeader && (
-              <button className="link-btn" onClick={() => setKeeperOpen(true)}>
+          <FundBar fund={ledger.fund} keeper={member(ledger.fund.keeperId)} currency={cur} />
+          <div className="pad chip-actions">
+            <button className="chip" onClick={() => open({ kind: 'deposit' })}>
+              <Plus size={16} /> Add to fund
+            </button>
+            {isLeader && ledger.fund.in > 0 && (
+              <button className="chip" onClick={() => setKeeperOpen(true)}>
                 Change keeper
               </button>
             )}
-          </div>
-          <ul className="list">
-            <li className="row">
-              <div className="row-main">
-                <div className="row-title">Cash left</div>
-                <div className="row-sub">Held by {keeper ? name(keeper.id) : '—'}</div>
-              </div>
-              <div className="row-end row-title">{money(ledger.fund.cash, cur)}</div>
-            </li>
-            <li className="row">
-              <div className="row-main row-title">Collected</div>
-              <div className="row-end num">{money(ledger.fund.in, cur)}</div>
-            </li>
-            <li className="row">
-              <div className="row-main row-title">Spent from fund</div>
-              <div className="row-end num">{money(ledger.fund.out, cur)}</div>
-            </li>
-            {data.members
-              .filter((m) => ledger.deposited[m.id])
-              .map((m) => (
-                <li key={m.id} className="row">
-                  <Avatar member={m} size="sm" />
-                  <div className="row-main row-sub">{name(m.id)} put in</div>
-                  <div className="row-end num">{money(ledger.deposited[m.id]!, cur)}</div>
-                </li>
-              ))}
-          </ul>
-          <p className="hint" style={{ marginTop: 10 }}>
-            Leftover fund cash counts as money the keeper holds for everyone, so it is already part of the payments above.
-          </p>
-          <div className="pad">
-            <button className="btn ghost block" onClick={() => open({ kind: 'deposit' })}>
-              Add money to fund
+            <button className="chip" onClick={() => open({ kind: 'payment' })}>
+              <Plus size={16} /> Other payment
             </button>
           </div>
         </section>
@@ -152,7 +106,7 @@ export function Settle() {
                 <button className="row" onClick={() => setKeeper(m.id)} aria-pressed={m.id === ledger.fund.keeperId}>
                   <Avatar member={m} />
                   <div className="row-main row-title">{m.name}</div>
-                  {m.id === ledger.fund.keeperId && <span className="tag accent">Keeper</span>}
+                  {m.id === ledger.fund.keeperId && <Check size={18} className="accent-ink" />}
                 </button>
               </li>
             ))}

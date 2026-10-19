@@ -1,0 +1,558 @@
+/* Visual summaries: transfers, charts, people strip, timeline. */
+
+.hero-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.hero-pills span {
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.hero-pills b {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* Settle-up transfers: from -> to, amount, tick. */
+.transfers {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0 var(--gutter);
+  display: grid;
+  gap: 8px;
+}
+
+.transfers li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px 10px 12px;
+  border-radius: 16px;
+  background: var(--paper-2);
+}
+
+.transfers li[data-mine='true'] {
+  background: var(--accent-soft);
+}
+
+.xfer-people {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.xfer-person {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  width: 52px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.xfer-person > span:last-child {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.transfers.compact .xfer-person {
+  flex-direction: row;
+  width: auto;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.xfer-arrow {
+  display: grid;
+  place-items: center;
+  color: var(--ink-3);
+}
+
+.xfer-amt {
+  font-size: 17px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.xfer-done {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  cursor: pointer;
+  transition: transform 140ms var(--ease-out);
+}
+
+.xfer-done:active {
+  transform: scale(0.92);
+}
+
+.square {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 32px var(--gutter) 12px;
+  color: var(--plus);
+}
+
+.square strong {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.chip-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+/* Category stacked bar */
+.catbar {
+  padding: 0 var(--gutter);
+}
+
+.catbar-track {
+  display: flex;
+  gap: 2px;
+  height: 14px;
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.catbar-track span {
+  min-width: 4px;
+  transform-origin: left;
+  animation: bar-in 420ms var(--ease-out);
+}
+
+.legend {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.legend .num {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+/* Fund bar */
+.fundbar {
+  margin: 20px var(--gutter) 0;
+}
+
+.fundbar-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.fundbar-keeper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 13px;
+}
+
+.fundbar-track {
+  height: 14px;
+  border-radius: 7px;
+  background: var(--accent);
+  overflow: hidden;
+}
+
+.fundbar-track span {
+  display: block;
+  height: 100%;
+  background: var(--ink-3);
+  transform-origin: left;
+  animation: bar-in 420ms var(--ease-out);
+}
+
+.fundbar-legend {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.fundbar-legend span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fundbar-legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.fundbar-legend .spent {
+  background: var(--ink-3);
+}
+
+.fundbar-legend .left {
+  background: var(--accent);
+}
+
+/* Diverging balance chart + per-person share bars */
+.balances,
+.share-bars {
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--gutter);
+  display: grid;
+  gap: 12px;
+}
+
+.balances li,
+.share-bars li {
+  display: grid;
+  grid-template-columns: 24px 64px 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.bal-name {
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bal-name .tag {
+  margin-left: 4px;
+}
+
+.bal-track {
+  position: relative;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--paper-2);
+}
+
+.bal-track::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -3px;
+  bottom: -3px;
+  width: 1.5px;
+  background: var(--rule);
+}
+
+.bal-plus,
+.bal-minus {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  animation: bar-in 420ms var(--ease-out);
+}
+
+.bal-plus {
+  left: 50%;
+  border-radius: 0 5px 5px 0;
+  background: var(--plus);
+  transform-origin: left;
+}
+
+.bal-minus {
+  right: 50%;
+  border-radius: 5px 0 0 5px;
+  background: var(--minus);
+  transform-origin: right;
+}
+
+.bal-amt {
+  min-width: 84px;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: right;
+}
+
+.share-track {
+  height: 10px;
+  border-radius: 5px;
+  background: var(--paper-2);
+  overflow: hidden;
+}
+
+.share-track span {
+  display: block;
+  height: 100%;
+  border-radius: 5px;
+  transform-origin: left;
+  animation: bar-in 420ms var(--ease-out);
+}
+
+/* ---------- Trip page ---------- */
+
+.code-pill-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px var(--gutter) 0;
+}
+
+.code-pill {
+  padding: 6px 12px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+}
+
+.code-pill-row .btn {
+  margin-left: auto;
+}
+
+.people-strip {
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--gutter) 4px;
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.people-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.people-strip > li {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  flex: none;
+  width: 68px;
+}
+
+.person {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  transition: transform 140ms var(--ease-out);
+}
+
+.person:disabled {
+  cursor: default;
+}
+
+.person:not(:disabled):active {
+  transform: scale(0.95);
+}
+
+.person-avatar {
+  position: relative;
+}
+
+.person-avatar .avatar,
+.person-add {
+  width: 52px;
+  height: 52px;
+  font-size: 17px;
+}
+
+.person-avatar[data-pending='true'] .avatar {
+  opacity: 0.45;
+}
+
+.person-add {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1.5px dashed var(--ink-3);
+  color: var(--ink-2);
+}
+
+.crown {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--paper);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 11px;
+}
+
+.person-name {
+  max-width: 68px;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* In the people strip, call and WhatsApp are small round icons. */
+.people-strip .contact-btns {
+  gap: 6px;
+}
+
+.people-strip .call-btn {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--paper-2);
+}
+
+.people-strip .call-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+.contact-btns-empty {
+  height: 30px;
+}
+
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--gutter);
+}
+
+.timeline li {
+  position: relative;
+}
+
+.timeline li:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 17px;
+  top: 40px;
+  bottom: -4px;
+  width: 2px;
+  background: var(--rule);
+}
+
+.tl-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tl-item:disabled {
+  cursor: default;
+}
+
+.tl-day {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tl-body {
+  display: grid;
+  min-width: 0;
+}
+
+.add-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: calc(100% - var(--gutter) * 2);
+  height: 52px;
+  margin: 0 var(--gutter);
+  padding: 0 14px;
+  border: 1.5px dashed var(--rule);
+  border-radius: 12px;
+  background: none;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: transform 140ms var(--ease-out);
+}
+
+.add-row:active {
+  transform: scale(0.98);
+}
+
+/* The Netlify free-plan badge is a fixed iframe at bottom-right; keep it above the tab bar. */
+@media (max-width: 959px) {
+  #nl-badge-frame {
+    bottom: calc(var(--tabbar-h) + var(--safe-b) + 8px) !important;
+  }
+}
+
+/* Rows next to call buttons must shrink, never push the page wider. */
+.list li > .row {
+  flex: 1;
+  min-width: 0;
+}
+
+.people-strip > li {
+  align-content: start;
+}

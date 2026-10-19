@@ -5,6 +5,7 @@ import { Toaster } from 'sonner';
 import { App } from './App';
 import { AuthProvider } from './lib/auth-context';
 import './styles/app.css';
+import './styles/visual.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

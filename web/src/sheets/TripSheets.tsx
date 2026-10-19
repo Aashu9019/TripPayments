@@ -177,7 +177,7 @@ export function MemberSheet({
         <div className="pad stack-gap" style={{ marginTop: 8 }}>
           {member.claimed && (
             <button className="btn ghost" disabled={busy} onClick={() => run(() => api.updateMember(code, member.id, { release: true }), 'Seat freed. They can join again.')}>
-              Sign them out (new phone)
+              Unlink their account
             </button>
           )}
           {!member.left_at && member.role !== 'leader' && (
