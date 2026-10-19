@@ -93,6 +93,7 @@ export const api = {
   join: (code: string, body: { memberId?: string; name?: string }) =>
     request<{ memberId: string }>('POST', `${t(code)}/join`, body),
   updateTrip: (code: string, body: Record<string, unknown>) => request('PATCH', t(code), body),
+  deleteTrip: (code: string, confirm: string) => request('DELETE', t(code), { confirm }),
   addMember: (code: string, body: { name: string; phone?: string }) =>
     request<{ id: string }>('POST', `${t(code)}/members`, body),
   updateMember: (code: string, id: string, body: Record<string, unknown>) =>

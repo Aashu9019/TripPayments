@@ -353,6 +353,18 @@ app.patch(
   }),
 );
 
+// Leader deletes the whole trip: members, payments, places. Clients confirm with the trip code.
+app.delete(
+  '/api/trips/:code',
+  wrap(async (req, res) => {
+    const trip = await loadTrip(req.params.code);
+    await auth(req, trip, { leader: true });
+    if (String(req.body?.confirm ?? '').toUpperCase() !== trip.code) throw bad('Type the trip code to confirm');
+    await query('DELETE FROM trips WHERE id = $1', [trip.id]);
+    res.json({ ok: true });
+  }),
+);
+
 // Members
 app.post(
   '/api/trips/:code/members',

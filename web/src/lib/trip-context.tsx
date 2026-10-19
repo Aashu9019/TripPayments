@@ -10,6 +10,8 @@ interface TripCtx {
   me: Member | null;
   isLeader: boolean;
   online: boolean;
+  /** The trip no longer exists (deleted by its leader or an admin). */
+  gone: boolean;
   /** Run a mutation then pull fresh state. Errors bubble to the caller. */
   mutate: <T>(fn: () => Promise<T>) => Promise<T>;
   refresh: () => Promise<void>;
@@ -21,6 +23,7 @@ const Ctx = createContext<TripCtx | null>(null);
 export function TripProvider({ code, children }: { code: string; children: ReactNode }) {
   const [data, setData] = useState<TripState | null>(() => cache.get(code));
   const [online, setOnline] = useState(true);
+  const [gone, setGone] = useState(false);
   const version = useRef<number | undefined>(data?.version);
 
   const refresh = useCallback(async () => {
@@ -33,6 +36,7 @@ export function TripProvider({ code, children }: { code: string; children: React
       setData(res);
     } catch (e) {
       if (e instanceof ApiError && e.status === 0) setOnline(false);
+      else if (e instanceof ApiError && e.status === 404) setGone(true);
       else throw e;
     }
   }, [code]);
@@ -72,11 +76,12 @@ export function TripProvider({ code, children }: { code: string; children: React
       me,
       isLeader: me?.role === 'leader',
       online,
+      gone,
       mutate,
       refresh,
       member: (id) => (id ? byId.get(id) : undefined),
     };
-  }, [code, data, online, mutate, refresh]);
+  }, [code, data, online, gone, mutate, refresh]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

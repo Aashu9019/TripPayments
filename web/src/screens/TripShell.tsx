@@ -38,7 +38,7 @@ export function TripShell() {
 }
 
 function Shell() {
-  const { data, code, online, me } = useTrip();
+  const { data, code, online, me, gone } = useTrip();
   const location = useLocation();
   const [draft, setDraft] = useState<EntryDraft | null>(null);
   const [open, setOpen] = useState(false);
@@ -51,6 +51,20 @@ function Shell() {
 
   const base = `/t/${code}`;
   const tab = location.pathname.slice(base.length).replace(/^\//, '').split('/')[0] ?? '';
+
+  if (gone) {
+    return (
+      <div className="frame narrow">
+        <div className="empty" style={{ paddingTop: 96 }}>
+          <strong>This trip was deleted</strong>
+          <p>The trip leader removed it, along with its payments.</p>
+          <Link to="/?all" className="btn">
+            Your trips
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   if (!data) {
     return (

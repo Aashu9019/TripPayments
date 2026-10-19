@@ -621,3 +621,36 @@
 .wordmark .person {
   margin-left: 12px;
 }
+
+/* ---------- Delete trip ---------- */
+
+.danger-zone {
+  margin: 24px var(--gutter) 8px;
+  padding-top: 20px;
+  border-top: 1px solid var(--rule);
+}
+
+.danger-note {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+.danger-note b {
+  color: var(--ink);
+}
+
+.btn.danger-solid {
+  background: var(--minus);
+  color: #fff;
+}
+
+/* Date inputs have a large intrinsic width; let them shrink inside two-column rows. */
+.two-up {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.input[type="date"] {
+  min-width: 0;
+  max-width: 100%;
+}

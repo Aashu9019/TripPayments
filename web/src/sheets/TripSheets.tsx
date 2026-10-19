@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, ApiError } from '../lib/api';
 import { useLoadedTrip } from '../lib/trip-context';
@@ -223,8 +225,31 @@ They will lose access to the trip.`;
 export function TripEditSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const { data, mutate, code } = useLoadedTrip();
   const t = data.trip;
+  const nav = useNavigate();
   const [f, setF] = useState({ name: '', destination: '', startDate: '', endDate: '', notes: '' });
   const [busy, setBusy] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [typed, setTyped] = useState('');
+
+  useEffect(() => {
+    if (open) {
+      setConfirming(false);
+      setTyped('');
+    }
+  }, [open]);
+
+  async function deleteTrip() {
+    setBusy(true);
+    try {
+      await api.deleteTrip(code, typed);
+      onOpenChange(false);
+      toast.success(`${t.name} deleted`);
+      nav('/?all', { replace: true });
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'Could not delete the trip');
+      setBusy(false);
+    }
+  }
   useEffect(() => {
     if (open)
       setF({
@@ -283,6 +308,42 @@ export function TripEditSheet({ open, onOpenChange }: { open: boolean; onOpenCha
         <span>Notes for everyone</span>
         <textarea className="input" value={f.notes} onChange={set('notes')} maxLength={4000} placeholder="Permits, packing list, meeting point…" rows={5} />
       </label>
+
+      <div className="danger-zone">
+        {!confirming ? (
+          <button className="btn danger block" onClick={() => setConfirming(true)}>
+            <Trash2 size={18} /> Delete trip
+          </button>
+        ) : (
+          <div className="stack-gap">
+            <p className="danger-note">
+              This deletes <b>{t.name}</b> for everyone: all payments, the fund, route, stays and contacts. It cannot be undone.
+            </p>
+            <label className="field" style={{ padding: 0, margin: 0 }}>
+              <span>
+                Type <b className="num">{code}</b> to confirm
+              </span>
+              <input
+                className="input code-input"
+                value={typed}
+                onChange={(e) => setTyped(e.target.value.replace(/[^a-z0-9]/gi, '').slice(0, 6).toUpperCase())}
+                autoCapitalize="characters"
+                autoComplete="off"
+                spellCheck={false}
+                placeholder={code}
+              />
+            </label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn ghost" style={{ flex: 1 }} onClick={() => { setConfirming(false); setTyped(''); }}>
+                Keep trip
+              </button>
+              <button className="btn danger-solid" style={{ flex: 1 }} disabled={typed !== code || busy} onClick={deleteTrip}>
+                Delete forever
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </Sheet>
   );
 }
