@@ -53,9 +53,15 @@ fewest payments needed to settle everyone.
 - Every member's number is one tap away (Call / WhatsApp)
 - Profile photo and name, set once and shown on every trip (photos are
   cropped and compressed on the phone before upload)
-- The leader can add people, remove people (with confirmation), hand over
-  leadership, or free up a seat. Removed people with payments keep their
-  balance until it is settled
+- Roles, Clash of Clans style:
+  - **Leader** (one): everything, including deleting the trip, making or
+    demoting co-leaders and handing over leadership
+  - **Co-leaders** (any number): everything except deleting the trip; they can
+    promote members, remove members, set photos, pick the fund keeper and fix
+    anyone's payments, but cannot act on the leader or other co-leaders
+  - **Members**: add and edit the route, stays, contacts, notes and trip
+    details, add friends, and add or edit their own payments
+- Removed people with payments keep their balance until it is settled
 - Everyone's screen updates within a few seconds of any change
 
 **App**

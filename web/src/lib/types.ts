@@ -1,4 +1,4 @@
-export type Role = 'leader' | 'member';
+export type Role = 'leader' | 'coleader' | 'member';
 
 export interface Member {
   id: string;

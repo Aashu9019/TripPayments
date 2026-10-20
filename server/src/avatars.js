@@ -39,11 +39,16 @@ export function avatarRoutes(app, { query, tx, wrap, requireUser, HttpError, id,
       const { rows } = await query('SELECT id, trip_id FROM members WHERE trip_id = $1 AND id = $2', [trip.id, req.params.id]);
       const target = rows[0];
       if (!target) throw new HttpError(404, 'Member not found');
-      const { rows: lead } = await query(
-        "SELECT 1 FROM members WHERE trip_id = $1 AND user_id = $2 AND role = 'leader' AND left_at IS NULL",
+      const { rows: mine } = await query(
+        'SELECT id, role FROM members WHERE trip_id = $1 AND user_id = $2 AND left_at IS NULL',
         [target.trip_id, user.id],
       );
-      if (!lead.length) throw new HttpError(403, 'Only the trip leader can do that');
+      const { rows: tr } = await query('SELECT role FROM members WHERE id = $1', [target.id]);
+      const RANK = { member: 0, coleader: 1, leader: 2 };
+      const me = mine[0];
+      if (!me || RANK[me.role] < 1 || RANK[me.role] <= RANK[tr[0].role]) {
+        throw new HttpError(403, 'Only the leader or a co-leader can set photos for people ranked below them');
+      }
       const m = /^data:(image\/(?:jpeg|webp|png));base64,([A-Za-z0-9+/=]+)$/.exec(String(req.body.image ?? ''));
       const remove = req.body.image === null;
       if (!remove && (!m || !TYPES[m[1]])) throw new HttpError(400, 'Send a JPEG, WebP or PNG image');

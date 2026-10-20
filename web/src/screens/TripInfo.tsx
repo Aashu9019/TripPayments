@@ -15,7 +15,7 @@ import { MemberSheet, PlaceSheet, TripEditSheet } from '../sheets/TripSheets';
 import { ProfileSheet } from '../components/ProfileSheet';
 
 export function TripInfo() {
-  const { data, me, isLeader, code, mutate, refresh } = useLoadedTrip();
+  const { data, me, isLeader, outranks, code, mutate, refresh } = useLoadedTrip();
   const [profile, setProfile] = useState(false);
   const openSwitcher = useOpenSwitcher();
   const nav = useNavigate();
@@ -53,7 +53,7 @@ export function TripInfo() {
   const head = (label: string, kind?: PlaceKind) => (
     <div className="section-head">
       {label}
-      {isLeader && kind && (
+      {kind && (
         <button className="link-btn" onClick={() => setPlace({ kind })} aria-label={`Add ${label.toLowerCase()}`}>
           <Plus size={16} />
         </button>
@@ -69,7 +69,7 @@ export function TripInfo() {
           sub={[t.destination, dateRange(t.start_date, t.end_date)].filter(Boolean).join(' · ') || 'Trip details'}
           onOpen={openSwitcher}
         />
-        {isLeader && (
+        {(
           <button className="icon-btn" aria-label="Edit trip details" onClick={() => setEditTrip(true)}>
             <Pencil size={18} />
           </button>
@@ -94,13 +94,14 @@ export function TripInfo() {
         {head(`People · ${people.length}`)}
         <ul className="people-strip">
           {people.map((m) => {
-            const canEdit = isLeader || m.id === me?.id;
+            const canEdit = outranks(m) || m.id === me?.id;
             return (
               <li key={m.id}>
                 <button className="person" onClick={() => (m.id === me?.id ? setProfile(true) : canEdit && setMember({ member: m }))} disabled={!canEdit} aria-label={m.name}>
                   <span className="person-avatar" data-pending={!m.claimed}>
                     <Avatar member={m} />
                     {m.role === 'leader' && <span className="crown" aria-label="Leader">★</span>}
+                    {m.role === 'coleader' && <span className="crown co" aria-label="Co-leader">☆</span>}
                   </span>
                   <span className="person-name">{m.id === me?.id ? 'You' : m.name.split(' ')[0]}</span>
                 </button>
@@ -108,7 +109,7 @@ export function TripInfo() {
               </li>
             );
           })}
-          {isLeader && (
+          {(
             <li>
               <button className="person" onClick={() => setMember({})} aria-label="Add a friend">
                 <span className="person-add">
@@ -123,14 +124,14 @@ export function TripInfo() {
 
       <div className="cols">
         <div>
-          {(stops.length > 0 || isLeader) && (
+          {true && (
             <section className="section">
               {head('Route', 'stop')}
               {stops.length ? (
                 <ol className="timeline">
                   {stops.map((p) => (
                     <li key={p.id}>
-                      <button className="tl-item" onClick={() => isLeader && setPlace({ kind: 'stop', place: p })} disabled={!isLeader}>
+                      <button className="tl-item" onClick={() => setPlace({ kind: 'stop', place: p })}>
                         <span className="tl-day num">{p.day != null ? `D${p.day}` : '•'}</span>
                         <span className="tl-body">
                           <span className="row-title">{p.title}</span>
@@ -148,13 +149,13 @@ export function TripInfo() {
         </div>
 
         <div>
-          {(stays.length > 0 || isLeader) && (
+          {true && (
             <section className="section">
               {head('Stays', 'stay')}
               {stays.length ? (
                 <ul className="list">
                   {stays.map((p) => (
-                    <PlaceRow key={p.id} p={p} icon={<BedDouble size={18} />} onEdit={isLeader ? () => setPlace({ kind: 'stay', place: p }) : undefined} />
+                    <PlaceRow key={p.id} p={p} icon={<BedDouble size={18} />} onEdit={() => setPlace({ kind: 'stay', place: p })} />
                   ))}
                 </ul>
               ) : (
@@ -163,13 +164,13 @@ export function TripInfo() {
             </section>
           )}
 
-          {(contacts.length > 0 || isLeader) && (
+          {true && (
             <section className="section">
               {head('Contacts', 'contact')}
               {contacts.length ? (
                 <ul className="list">
                   {contacts.map((p) => (
-                    <PlaceRow key={p.id} p={p} icon={<PhoneCall size={18} />} onEdit={isLeader ? () => setPlace({ kind: 'contact', place: p }) : undefined} />
+                    <PlaceRow key={p.id} p={p} icon={<PhoneCall size={18} />} onEdit={() => setPlace({ kind: 'contact', place: p })} />
                   ))}
                 </ul>
               ) : (
@@ -182,7 +183,7 @@ export function TripInfo() {
             <section className="section">
               <div className="section-head">
                 Notes
-                {isLeader && (
+                {(
                   <button className="link-btn" onClick={() => setEditTrip(true)} aria-label="Edit notes">
                     <Pencil size={14} />
                   </button>

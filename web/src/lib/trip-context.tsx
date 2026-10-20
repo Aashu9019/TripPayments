@@ -3,12 +3,18 @@ import { api, ApiError, cache } from './api';
 import type { Member, TripState } from './types';
 
 const POLL_MS = 6000;
+const RANK = { member: 0, coleader: 1, leader: 2 } as const;
 
 interface TripCtx {
   code: string;
   data: TripState | null;
   me: Member | null;
+  /** The one leader: can also delete the trip. */
   isLeader: boolean;
+  /** Leader or co-leader: manage people, fund keeper, anyone's payments. */
+  canManage: boolean;
+  /** Can act on this member (they rank below you). */
+  outranks: (m: Member | undefined | null) => boolean;
   online: boolean;
   /** The trip no longer exists (deleted by its leader). */
   gone: boolean;
@@ -82,6 +88,8 @@ export function TripProvider({ code, children }: { code: string; children: React
       data,
       me,
       isLeader: me?.role === 'leader',
+      canManage: me?.role === 'leader' || me?.role === 'coleader',
+      outranks: (m) => !!me && !!m && (me.role === 'leader' || me.role === 'coleader') && RANK[me.role] > RANK[m.role],
       online,
       gone,
       mutate,

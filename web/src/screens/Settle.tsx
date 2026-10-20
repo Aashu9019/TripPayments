@@ -9,7 +9,7 @@ import { BalanceChart, FundBar } from '../components/charts';
 import { useOpenEntry } from './TripShell';
 
 export function Settle() {
-  const { data, me, member, isLeader, mutate, code } = useLoadedTrip();
+  const { data, me, member, canManage, mutate, code } = useLoadedTrip();
   const open = useOpenEntry();
   const [keeperOpen, setKeeperOpen] = useState(false);
   const { ledger, trip } = data;
@@ -85,7 +85,7 @@ export function Settle() {
             <button className="chip" onClick={() => open({ kind: 'deposit' })}>
               <Plus size={16} /> Add to fund
             </button>
-            {isLeader && ledger.fund.in > 0 && (
+            {canManage && ledger.fund.in > 0 && (
               <button className="chip" onClick={() => setKeeperOpen(true)}>
                 Change keeper
               </button>

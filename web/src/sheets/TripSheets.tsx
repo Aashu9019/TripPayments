@@ -128,7 +128,7 @@ export function MemberSheet({
   onOpenChange: (o: boolean) => void;
   member?: Member;
 }) {
-  const { mutate, code, me, isLeader, data } = useLoadedTrip();
+  const { mutate, code, me, isLeader, outranks, data } = useLoadedTrip();
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [busy, setBusy] = useState(false);
@@ -168,7 +168,7 @@ export function MemberSheet({
         id = res.id;
         linked = res.linked;
       }
-      if (id && photo !== undefined && isLeader) await api.setMemberAvatar(code, id, photo);
+      if (id && photo !== undefined && (!member || outranks(member))) await api.setMemberAvatar(code, id, photo);
       if (linked) toast.success(`${name} already has an account, so the trip is in their list now`);
     });
   };
@@ -190,7 +190,7 @@ export function MemberSheet({
     name: name || 'New friend',
     avatar: photo === null ? null : (member?.avatar ?? null),
   };
-  const canPhoto = isLeader && !self;
+  const canPhoto = !self && (!member || outranks(member)) && (isLeader || me?.role === 'coleader');
 
   return (
     <Sheet
@@ -239,20 +239,37 @@ export function MemberSheet({
         </p>
       )}
 
-      {member && isLeader && !self && (
+      {member && !self && outranks(member) && (
         <div className="pad stack-gap" style={{ marginTop: 8 }}>
           {member.claimed && (
             <button className="btn ghost" disabled={busy} onClick={() => run(() => api.updateMember(code, member.id, { release: true }), 'Seat freed. They can join again.')}>
               Unlink their account
             </button>
           )}
-          {!member.left_at && member.role !== 'leader' && (
+          {!member.left_at && member.role === 'member' && (
             <button
               className="btn ghost"
               disabled={busy}
-              onClick={() => confirm(`Make ${member.name} the trip leader? You will become a member.`) && run(() => api.updateMember(code, member.id, { makeLeader: true }), 'Leader changed')}
+              onClick={() => run(() => api.updateMember(code, member.id, { role: 'coleader' }), `${member.name} is now a co-leader`)}
             >
-              Make trip leader
+              Make co-leader
+            </button>
+          )}
+          {!member.left_at && member.role === 'coleader' && isLeader && (
+            <button className="btn ghost" disabled={busy} onClick={() => run(() => api.updateMember(code, member.id, { role: 'member' }), `${member.name} is a member again`)}>
+              Remove co-leader
+            </button>
+          )}
+          {!member.left_at && isLeader && member.claimed && (
+            <button
+              className="btn ghost"
+              disabled={busy}
+              onClick={() =>
+                confirm(`Make ${member.name} the trip leader?\n\nYou will become a co-leader. Only the leader can delete the trip.`) &&
+                run(() => api.updateMember(code, member.id, { makeLeader: true }), `${member.name} leads the trip now`)
+              }
+            >
+              Hand over leadership
             </button>
           )}
           {member.left_at ? (
@@ -287,7 +304,7 @@ They will lose access to the trip.`;
 }
 
 export function TripEditSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
-  const { data, mutate, code } = useLoadedTrip();
+  const { data, mutate, code, isLeader } = useLoadedTrip();
   const t = data.trip;
   const nav = useNavigate();
   const [f, setF] = useState({ name: '', destination: '', startDate: '', endDate: '', notes: '' });
@@ -365,6 +382,7 @@ export function TripEditSheet({ open, onOpenChange }: { open: boolean; onOpenCha
         <textarea className="input" value={f.notes} onChange={set('notes')} maxLength={4000} placeholder="Permits, packing list, meeting point…" rows={5} />
       </label>
 
+      {isLeader && (
       <div className="danger-zone">
         {!confirming ? (
           <button className="btn danger block" onClick={() => setConfirming(true)}>
@@ -400,6 +418,7 @@ export function TripEditSheet({ open, onOpenChange }: { open: boolean; onOpenCha
           </div>
         )}
       </div>
+      )}
     </Sheet>
   );
 }

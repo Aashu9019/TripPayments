@@ -41,7 +41,7 @@ export function TripList({ trips, current, onPick }: { trips: MyTrip[]; current?
             <button className="row" onClick={() => onPick(t.code)} aria-current={t.code === current ? 'true' : undefined}>
               <div className="row-main">
                 <div className="row-title">
-                  {t.name} {t.role === 'leader' && <span className="tag">Leader</span>}
+                  {t.name} {t.role === 'leader' ? <span className="tag">Leader</span> : t.role === 'coleader' ? <span className="tag">Co-leader</span> : null}
                 </div>
                 <div className="row-sub">{meta}</div>
               </div>

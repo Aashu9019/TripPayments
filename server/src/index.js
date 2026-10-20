@@ -113,8 +113,14 @@ async function requireUser(req) {
   return user;
 }
 
-/** The caller's membership in this trip. */
-async function auth(req, trip, { leader = false } = {}) {
+// Roles, Clash of Clans style. Leader: everything. Co-leader: everything but
+// deleting the trip or acting on equal/higher ranks. Member: trip info + own payments.
+const RANK = { member: 0, coleader: 1, leader: 2 };
+const rank = (m) => RANK[m.role] ?? 0;
+const canManage = (m) => rank(m) >= RANK.coleader;
+
+/** The caller's membership in this trip. `manage`: leader or co-leader. `owner`: leader only. */
+async function auth(req, trip, { manage = false, owner = false } = {}) {
   const user = await requireUser(req);
   const { rows } = await query('SELECT * FROM members WHERE trip_id = $1 AND user_id = $2 AND left_at IS NULL', [
     trip.id,
@@ -122,7 +128,8 @@ async function auth(req, trip, { leader = false } = {}) {
   ]);
   const me = rows[0];
   if (!me) throw new HttpError(403, 'You are not on this trip. Join it first.');
-  if (leader && me.role !== 'leader') throw new HttpError(403, 'Only the trip leader can do that');
+  if (owner && me.role !== 'leader') throw new HttpError(403, 'Only the trip leader can do that');
+  if (manage && !canManage(me)) throw new HttpError(403, 'Only the leader or a co-leader can do that');
   return me;
 }
 
@@ -392,8 +399,9 @@ app.patch(
   '/api/trips/:code',
   wrap(async (req, res) => {
     const trip = await loadTrip(req.params.code, req);
-    await auth(req, trip, { leader: true });
+    const me = await auth(req, trip);
     const b = req.body;
+    if (b.fundKeeperId !== undefined && !canManage(me)) throw new HttpError(403, 'Only the leader or a co-leader can change the fund keeper');
     const next = {
       name: b.name !== undefined ? str(b.name, 80) || trip.name : trip.name,
       destination: b.destination !== undefined ? str(b.destination, 120) : trip.destination,
@@ -420,7 +428,7 @@ app.delete(
   '/api/trips/:code',
   wrap(async (req, res) => {
     const trip = await loadTrip(req.params.code, req);
-    await auth(req, trip, { leader: true });
+    await auth(req, trip, { owner: true });
     if (String(req.body?.confirm ?? '').toUpperCase() !== trip.code) throw bad('Type the trip code to confirm');
     await query('DELETE FROM trips WHERE id = $1', [trip.id]);
     res.json({ ok: true });
@@ -432,7 +440,7 @@ app.post(
   '/api/trips/:code/members',
   wrap(async (req, res) => {
     const trip = await loadTrip(req.params.code, req);
-    await auth(req, trip, { leader: true });
+    await auth(req, trip);
     const name = str(req.body.name, 40);
     if (!name) throw bad('Add a name');
     const memberId = id();
@@ -463,19 +471,29 @@ app.patch(
   wrap(async (req, res) => {
     const trip = await loadTrip(req.params.code, req);
     const me = await auth(req, trip);
-    const isLeader = me.role === 'leader';
     const self = me.id === req.params.id;
-    if (!isLeader && !self) throw new HttpError(403, 'You can only edit yourself');
     const { rows } = await query('SELECT * FROM members WHERE id = $1 AND trip_id = $2', [req.params.id, trip.id]);
     const m = rows[0];
     if (!m) throw new HttpError(404, 'Member not found');
+    // You may change yourself, or anyone ranked below you if you are leader / co-leader.
+    const over = canManage(me) && rank(me) > rank(m);
+    if (!self && !over) throw new HttpError(403, 'You can only change people ranked below you');
     const b = req.body;
     let role = m.role;
-    if (b.makeLeader && isLeader && !self) {
-      // Hand over leadership.
-      await query("UPDATE members SET role = 'member' WHERE id = $1", [me.id]);
+    if (b.role === 'coleader' && m.role === 'member') {
+      if (!canManage(me)) throw new HttpError(403, 'Only the leader or a co-leader can promote');
+      role = 'coleader';
+    } else if (b.role === 'member' && m.role === 'coleader') {
+      if (me.role !== 'leader' && !self) throw new HttpError(403, 'Only the leader can demote a co-leader');
+      role = 'member';
+    }
+    if (b.makeLeader && !self) {
+      if (me.role !== 'leader') throw new HttpError(403, 'Only the leader can hand over leadership');
+      // Hand over leadership; the old leader stays on as co-leader.
+      await query("UPDATE members SET role = 'coleader' WHERE id = $1", [me.id]);
       role = 'leader';
     }
+    if (b.left === true && self && m.role === 'leader') throw bad('Hand over leadership before leaving the trip');
     const rawPhone = b.phone !== undefined ? str(b.phone, 30) : null;
     const newPhone = rawPhone === null ? m.phone : rawPhone ? (normalizePhone(rawPhone) ?? rawPhone) : '';
     await query(
@@ -487,9 +505,9 @@ app.patch(
         b.name !== undefined ? str(b.name, 40) || m.name : m.name,
         newPhone,
         role,
-        Boolean(b.release && isLeader && !self),
-        Boolean(b.left === true && m.role !== 'leader'),
-        Boolean(b.left === false && isLeader),
+        Boolean(b.release && over),
+        Boolean(b.left === true && (self || over) && m.role !== 'leader'),
+        Boolean(b.left === false && canManage(me)),
         m.id,
       ],
     );
@@ -507,8 +525,11 @@ app.delete(
   '/api/trips/:code/members/:id',
   wrap(async (req, res) => {
     const trip = await loadTrip(req.params.code, req);
-    const me = await auth(req, trip, { leader: true });
-    if (me.id === req.params.id) throw bad('Hand over leadership before removing yourself');
+    const me = await auth(req, trip, { manage: true });
+    if (me.id === req.params.id) throw bad('Use Leave trip to remove yourself');
+    const { rows: target } = await query('SELECT role FROM members WHERE id = $1 AND trip_id = $2', [req.params.id, trip.id]);
+    if (!target[0]) throw new HttpError(404, 'Member not found');
+    if (rank(me) <= rank(target[0])) throw new HttpError(403, 'You can only remove people ranked below you');
     const { rows } = await query(
       `SELECT 1 FROM entries WHERE trip_id = $1 AND (from_id = $2 OR to_id = $2 OR shares ? $2) LIMIT 1`,
       [trip.id, req.params.id],
@@ -598,8 +619,8 @@ async function ownEntry(req, trip) {
   const me = await auth(req, trip);
   const { rows } = await query('SELECT * FROM entries WHERE id = $1 AND trip_id = $2', [req.params.id, trip.id]);
   if (!rows[0]) throw new HttpError(404, 'Entry not found');
-  if (me.role !== 'leader' && rows[0].created_by !== me.id) {
-    throw new HttpError(403, 'Only the person who added this, or the leader, can change it');
+  if (!canManage(me) && rows[0].created_by !== me.id) {
+    throw new HttpError(403, 'Only the person who added this, the leader or a co-leader can change it');
   }
   return rows[0];
 }
@@ -649,7 +670,7 @@ app.post(
   '/api/trips/:code/places',
   wrap(async (req, res) => {
     const trip = await loadTrip(req.params.code, req);
-    await auth(req, trip, { leader: true });
+    await auth(req, trip);
     const placeId = id();
     await tx(async (run) => {
       await run(
@@ -666,7 +687,7 @@ app.put(
   '/api/trips/:code/places/:id',
   wrap(async (req, res) => {
     const trip = await loadTrip(req.params.code, req);
-    await auth(req, trip, { leader: true });
+    await auth(req, trip);
     await tx(async (run) => {
       await run(
         'UPDATE places SET kind=$1, title=$2, phone=$3, address=$4, day=$5, note=$6, sort=$7 WHERE id=$8 AND trip_id=$9',
@@ -682,7 +703,7 @@ app.delete(
   '/api/trips/:code/places/:id',
   wrap(async (req, res) => {
     const trip = await loadTrip(req.params.code, req);
-    await auth(req, trip, { leader: true });
+    await auth(req, trip);
     await tx(async (run) => {
       await run('DELETE FROM places WHERE id = $1 AND trip_id = $2', [req.params.id, trip.id]);
       await bump(run, trip.id);

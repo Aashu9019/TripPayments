@@ -34,7 +34,7 @@ export function EntrySheet({
   onOpenChange: (o: boolean) => void;
   draft: EntryDraft | null;
 }) {
-  const { data, me, isLeader, mutate, code, member } = useLoadedTrip();
+  const { data, me, canManage, mutate, code, member } = useLoadedTrip();
   const active = data.members.filter((m) => !m.left_at);
   const editing = draft?.entry;
 
@@ -163,7 +163,7 @@ export function EntrySheet({
     setCapped(null);
   }
 
-  const canDelete = editing && (isLeader || editing.created_by === me?.id);
+  const canDelete = editing && (canManage || editing.created_by === me?.id);
 
   function validate(): string | null {
     if (!total) return 'Enter an amount';
