@@ -1154,3 +1154,200 @@
   background-size: 5px 5px, 5px 5px;
   background-repeat: no-repeat;
 }
+
+/* ---------- Settle v3 ---------- */
+
+.settle-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  padding: 4px var(--gutter) 14px;
+  font-size: 15px;
+  color: var(--ink-2);
+}
+
+.settle-summary > .num:first-child {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.settle-me {
+  margin-left: auto;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--paper-2);
+}
+
+.pay-group {
+  margin: 0 var(--gutter) 12px;
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--paper-2);
+}
+
+.pay-group[data-tone='in'] {
+  background: color-mix(in srgb, var(--plus) 10%, var(--paper));
+}
+
+.pay-group[data-tone='out'] {
+  background: color-mix(in srgb, var(--minus) 9%, var(--paper));
+}
+
+.pay-group-head {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 14px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.pay-group ul {
+  list-style: none;
+  margin: 0;
+  padding: 0 6px 6px;
+}
+
+.pay-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 8px;
+}
+
+.pay-row + .pay-row {
+  border-top: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
+}
+
+/* Two overlapping avatars: payer in front, receiver behind. */
+.pay-pair {
+  position: relative;
+  display: flex;
+  flex: none;
+  width: 58px;
+}
+
+.pay-pair .avatar:last-child {
+  margin-left: -14px;
+  box-shadow: 0 0 0 2px var(--paper);
+}
+
+.pay-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.pay-who {
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pay-who b {
+  font-weight: 600;
+}
+
+.pay-amt {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.mark-paid {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  height: 38px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: transform 140ms var(--ease-out);
+}
+
+.mark-paid:active {
+  transform: scale(0.95);
+}
+
+/* Balances with an expandable "why" */
+.bal-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--gutter);
+}
+
+.bal-item + .bal-item {
+  border-top: 1px solid var(--rule);
+}
+
+.bal-row {
+  display: grid;
+  grid-template-columns: 24px 72px 1fr auto 16px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 50px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.bal-chev {
+  transition: transform 200ms var(--ease-out);
+}
+
+.bal-item[data-open='true'] .bal-chev {
+  transform: rotate(180deg);
+}
+
+.bal-why {
+  margin: 0 0 12px 32px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--paper-2);
+  font-size: 14px;
+  animation: rise-in 180ms var(--ease-out);
+}
+
+.why-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 0;
+  color: var(--ink-2);
+}
+
+.why-total {
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--rule);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.square span {
+  font-size: 14px;
+}
+
+/* Payer sits in front of the receiver */
+.pay-pair .avatar:first-child {
+  position: relative;
+  z-index: 1;
+  box-shadow: 0 0 0 2px var(--paper);
+}

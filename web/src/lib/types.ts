@@ -62,7 +62,10 @@ export interface Ledger {
   deposited: Record<string, number>;
   total: number;
   fund: { in: number; out: number; cash: number; keeperId: string | null };
+  /** Fewest payments (debts simplified through other people). */
   transfers: { from: string; to: string; amount: number }[];
+  /** Who owes whom directly, pair by pair. */
+  direct: { from: string; to: string; amount: number }[];
 }
 
 export interface TripState {

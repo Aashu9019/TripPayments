@@ -8,16 +8,18 @@ import { CategoryDonut, RingTile } from '../components/charts';
 import { TripTitle } from '../components/TripSwitcher';
 import { useOpenEntry, useOpenSwitcher } from './TripShell';
 import { shareInvite } from '../lib/share';
+import { suggested, useSettleMode } from '../lib/settle-mode';
 
 export function Home() {
   const { data, me, member, code } = useLoadedTrip();
   const open = useOpenEntry();
   const openSwitcher = useOpenSwitcher();
+  const [settleMode] = useSettleMode();
   const { ledger, trip } = data;
   const cur = trip.currency;
   const myNet = me ? (ledger.net[me.id] ?? 0) : 0;
   const myShare = me ? (ledger.spent[me.id] ?? 0) : 0;
-  const myMoves = ledger.transfers.filter((t) => t.from === me?.id || t.to === me?.id);
+  const myMoves = suggested(ledger, settleMode).filter((t) => t.from === me?.id || t.to === me?.id);
   const keeper = member(ledger.fund.keeperId);
   const empty = data.entries.length === 0;
 

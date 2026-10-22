@@ -79,6 +79,7 @@ export function computeBalances(members, entries, fundKeeperId) {
     total,
     fund: { in: fundIn, out: fundOut, cash: fundCash, keeperId: keeper },
     transfers: settle(net),
+    direct: directDebts(members, entries, keeper),
   };
 }
 
@@ -104,4 +105,44 @@ export function settle(net) {
     if (cred[j].v === 0) j++;
   }
   return out;
+}
+
+/**
+ * Who owes whom directly, without simplifying through third people.
+ * Each expense makes every participant owe the payer their share; the common
+ * fund's side is carried by its keeper (depositors are owed by the keeper,
+ * fund-paid shares are owed to the keeper). Recorded payments reduce the
+ * pair they were between. Each pair nets to one payment.
+ * Per person this always adds up to the same balance as `net`.
+ */
+export function directDebts(members, entries, keeperId) {
+  const ids = new Set(members.map((m) => m.id));
+  const owe = new Map(); // "a>b" -> amount a owes b
+  const add = (a, b, v) => {
+    if (!a || !b || a === b || !ids.has(a) || !ids.has(b) || !v) return;
+    owe.set(`${a}>${b}`, (owe.get(`${a}>${b}`) ?? 0) + v);
+  };
+  for (const e of entries) {
+    const amt = Number(e.amount);
+    if (e.kind === 'expense') {
+      const payer = e.from_id ?? keeperId;
+      for (const [id, share] of Object.entries(e.shares ?? {})) add(id, payer, Number(share));
+    } else if (e.kind === 'deposit') {
+      add(keeperId, e.from_id, amt);
+    } else if (e.kind === 'payment') {
+      add(e.to_id, e.from_id, amt); // paying someone back cancels what you owed them
+    }
+  }
+  const out = [];
+  const seen = new Set();
+  for (const key of owe.keys()) {
+    const [a, b] = key.split('>');
+    const pair = a < b ? `${a}|${b}` : `${b}|${a}`;
+    if (seen.has(pair)) continue;
+    seen.add(pair);
+    const d = (owe.get(`${a}>${b}`) ?? 0) - (owe.get(`${b}>${a}`) ?? 0);
+    if (d > 0) out.push({ from: a, to: b, amount: d });
+    else if (d < 0) out.push({ from: b, to: a, amount: -d });
+  }
+  return out.sort((x, y) => y.amount - x.amount);
 }
