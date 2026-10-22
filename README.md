@@ -205,7 +205,9 @@ session token, sent as `Authorization: Bearer <token>`. Full reference in
 ## Limitations
 
 - Adding or editing needs a connection; offline mode is read-only.
-- One currency per trip (Nepali rupees by default), no conversion.
+- One currency per trip, chosen by the leader or a co-leader (NPR by
+  default; INR, USD, EUR and more). Changing it relabels amounts, it does not
+  convert them.
 - No SMS verification of phone numbers (it costs money per message); the
   number is the login, protected by a password.
 - No password reset yet; the leader can free your seat so you can rejoin

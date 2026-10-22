@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { DateField } from '../components/DateField';
+import { currencySymbol } from '../lib/format';
 import { autoSplit, equalShares, maxFor } from '../lib/split';
 import { toast } from 'sonner';
 import { Search } from 'lucide-react';
@@ -332,7 +333,7 @@ export function EntrySheet({
         </div>
       )}
       <label className="amount-input">
-        <span>{data.trip.currency === 'NPR' ? 'Rs' : data.trip.currency}</span>
+        <span>{currencySymbol(data.trip.currency)}</span>
         <input
           inputMode="decimal"
           placeholder="0"

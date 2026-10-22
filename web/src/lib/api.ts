@@ -87,7 +87,7 @@ export const api = {
   login: (body: { phone: string; password: string }) => request<AuthRes>('POST', '/auth/login', body),
   logout: () => request('POST', '/auth/logout', {}),
   myTrips: () => request<{ trips: MyTrip[] }>('GET', '/me/trips'),
-  createTrip: (body: { name: string; destination?: string; startDate?: string; endDate?: string }) =>
+  createTrip: (body: { name: string; destination?: string; startDate?: string; endDate?: string; currency?: string }) =>
     request<{ code: string }>('POST', '/trips', body),
   getTrip: (code: string, v?: number) =>
     request<TripState | { unchanged: true }>('GET', `${t(code)}${v ? `?v=${v}` : ''}`),

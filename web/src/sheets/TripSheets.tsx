@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { DateField } from '../components/DateField';
+import { CurrencyField } from '../components/CurrencyField';
 import { useNavigate } from 'react-router-dom';
 import { Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -304,10 +305,10 @@ They will lose access to the trip.`;
 }
 
 export function TripEditSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
-  const { data, mutate, code, isLeader } = useLoadedTrip();
+  const { data, mutate, code, isLeader, canManage } = useLoadedTrip();
   const t = data.trip;
   const nav = useNavigate();
-  const [f, setF] = useState({ name: '', destination: '', startDate: '', endDate: '', notes: '' });
+  const [f, setF] = useState({ name: '', destination: '', startDate: '', endDate: '', notes: '', currency: 'NPR' });
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [typed, setTyped] = useState('');
@@ -339,6 +340,7 @@ export function TripEditSheet({ open, onOpenChange }: { open: boolean; onOpenCha
         startDate: t.start_date?.slice(0, 10) ?? '',
         endDate: t.end_date?.slice(0, 10) ?? '',
         notes: t.notes,
+        currency: t.currency,
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -347,7 +349,11 @@ export function TripEditSheet({ open, onOpenChange }: { open: boolean; onOpenCha
   async function save() {
     setBusy(true);
     try {
-      await mutate(() => api.updateTrip(code, f));
+      await mutate(() => {
+        // Members edit trip info; only leader / co-leaders may change the currency.
+        const { currency, ...rest } = f;
+        return api.updateTrip(code, canManage ? { ...rest, currency } : rest);
+      });
       onOpenChange(false);
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : 'Could not save');
@@ -377,6 +383,13 @@ export function TripEditSheet({ open, onOpenChange }: { open: boolean; onOpenCha
       </label>
       <DateField label="From" value={f.startDate} onChange={(v) => setF((x) => ({ ...x, startDate: v }))} optional />
       <DateField label="To" value={f.endDate} onChange={(v) => setF((x) => ({ ...x, endDate: v }))} optional />
+      {canManage && (
+        <CurrencyField
+          value={f.currency}
+          onChange={(v) => setF((x) => ({ ...x, currency: v }))}
+          warnConvert={f.currency !== t.currency && data.entries.length > 0}
+        />
+      )}
       <label className="field">
         <span>Notes for everyone</span>
         <textarea className="input" value={f.notes} onChange={set('notes')} maxLength={4000} placeholder="Permits, packing list, meeting point…" rows={5} />

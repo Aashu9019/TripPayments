@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { DateField } from '../components/DateField';
+import { CurrencyField } from '../components/CurrencyField';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
 import { api, ApiError } from '../lib/api';
@@ -7,7 +8,7 @@ import { TopBar } from '../components/ui';
 
 export function CreateTrip() {
   const nav = useNavigate();
-  const [form, setForm] = useState({ name: '', destination: '', startDate: '', endDate: '' });
+  const [form, setForm] = useState({ name: '', destination: '', startDate: '', endDate: '', currency: 'NPR' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const set = (k: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [k]: e.target.value });
@@ -45,6 +46,7 @@ export function CreateTrip() {
           </label>
           <DateField label="From" value={form.startDate} onChange={(v) => setForm((f) => ({ ...f, startDate: v }))} optional />
           <DateField label="To" value={form.endDate} onChange={(v) => setForm((f) => ({ ...f, endDate: v }))} optional />
+          <CurrencyField value={form.currency} onChange={(v) => setForm((f) => ({ ...f, currency: v }))} />
           <p className="hint">You'll be the trip leader. You can add friends and hand over leadership later.</p>
           {error && <p className="form-error" role="alert">{error}</p>}
           <div className="pad">

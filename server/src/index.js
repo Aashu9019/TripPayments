@@ -25,6 +25,14 @@ class HttpError extends Error {
 }
 const bad = (msg) => new HttpError(400, msg);
 
+/** Currencies a trip can use (labels only; amounts are never converted). */
+const CURRENCIES = new Set('NPR INR USD EUR GBP AUD CAD CNY JPY THB BDT LKR AED SGD MYR'.split(' '));
+const currency = (v) => {
+  const c = String(v ?? '').trim().toUpperCase();
+  if (!CURRENCIES.has(c)) throw bad('Pick a currency from the list');
+  return c;
+};
+
 /** "9841234567", "+977-984-1234567" -> "+9779841234567". Nepal is the default country. */
 function normalizePhone(v) {
   if (typeof v !== 'string') return null;
@@ -330,7 +338,7 @@ app.post(
         `INSERT INTO trips (id, code, name, destination, start_date, end_date, currency, fund_keeper_id)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [tripId, code, name, str(req.body.destination, 120), date(req.body.startDate), date(req.body.endDate),
-          str(req.body.currency, 3).toUpperCase() || 'NPR', memberId],
+          req.body.currency ? currency(req.body.currency) : 'NPR', memberId],
       );
       await run(
         `INSERT INTO members (id, trip_id, name, role, color, user_id, phone) VALUES ($1, $2, $3, 'leader', 0, $4, $5)`,
@@ -402,6 +410,7 @@ app.patch(
     const me = await auth(req, trip);
     const b = req.body;
     if (b.fundKeeperId !== undefined && !canManage(me)) throw new HttpError(403, 'Only the leader or a co-leader can change the fund keeper');
+    if (b.currency !== undefined && !canManage(me)) throw new HttpError(403, 'Only the leader or a co-leader can change the currency');
     const next = {
       name: b.name !== undefined ? str(b.name, 80) || trip.name : trip.name,
       destination: b.destination !== undefined ? str(b.destination, 120) : trip.destination,
@@ -409,15 +418,16 @@ app.patch(
       end_date: b.endDate !== undefined ? date(b.endDate) : trip.end_date,
       notes: b.notes !== undefined ? str(b.notes, 4000) : trip.notes,
       fund_keeper_id: b.fundKeeperId !== undefined ? b.fundKeeperId : trip.fund_keeper_id,
+      currency: b.currency !== undefined ? currency(b.currency) : trip.currency,
     };
     if (b.fundKeeperId !== undefined) {
       const { rows } = await query('SELECT 1 FROM members WHERE id = $1 AND trip_id = $2', [b.fundKeeperId, trip.id]);
       if (!rows.length) throw bad('Fund keeper must be on the trip');
     }
     await query(
-      `UPDATE trips SET name=$1, destination=$2, start_date=$3, end_date=$4, notes=$5, fund_keeper_id=$6,
-       version = version + 1 WHERE id = $7`,
-      [next.name, next.destination, next.start_date, next.end_date, next.notes, next.fund_keeper_id, trip.id],
+      `UPDATE trips SET name=$1, destination=$2, start_date=$3, end_date=$4, notes=$5, fund_keeper_id=$6, currency=$7,
+       version = version + 1 WHERE id = $8`,
+      [next.name, next.destination, next.start_date, next.end_date, next.notes, next.fund_keeper_id, next.currency, trip.id],
     );
     res.json({ ok: true });
   }),
