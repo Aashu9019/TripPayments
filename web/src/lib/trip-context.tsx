@@ -30,7 +30,9 @@ export function TripProvider({ code, children }: { code: string; children: React
   const [data, setData] = useState<TripState | null>(() => cache.get(code));
   const [online, setOnline] = useState(true);
   const [gone, setGone] = useState(false);
-  const version = useRef<number | undefined>(data?.version);
+  // A copy saved by an older app version may lack newer fields (e.g. direct debts).
+  // Don't trust its version number, so the first sync downloads the full trip.
+  const version = useRef<number | undefined>(data?.ledger?.direct ? data.version : undefined);
 
   const refresh = useCallback(async () => {
     try {

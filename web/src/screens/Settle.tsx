@@ -40,7 +40,9 @@ export function Settle() {
   }, [data.entries]);
   const payments = data.entries.filter((e) => e.kind === 'payment');
 
-  const list = suggested(ledger, mode);
+  // Older API versions only send the simplified list; hide the switch then.
+  const hasDirect = Array.isArray(ledger.direct);
+  const list = suggested(ledger, hasDirect ? mode : 'fewest');
   const toMe = list.filter((t) => t.to === me?.id);
   const fromMe = list.filter((t) => t.from === me?.id);
   const others = list.filter((t) => t.to !== me?.id && t.from !== me?.id);
@@ -108,7 +110,7 @@ export function Settle() {
 
       <div className="cols">
         <div>
-          {list.length > 0 && (
+          {list.length > 0 && hasDirect && (
             <>
               <div className="segmented" role="radiogroup" aria-label="How to settle" style={{ marginTop: 4 }}>
                 <button role="radio" aria-checked={mode === 'direct'} onClick={() => setMode('direct')}>
