@@ -1,6 +1,6 @@
 # SajiloTrip — trip money, settled
 
-**Live app:** https://sajilotrip.netlify.app
+**Live app:** https://sajilotrip.onrender.com
 
 SajiloTrip is a small shared ledger for groups of friends on a trip. Log who paid
 for what, split it in a tap, and always know who owes whom — including the
@@ -76,7 +76,7 @@ fewest payments needed to settle everyone.
 
 ## Using the app
 
-1. Open the [live app](https://sajilotrip.netlify.app), create an account with
+1. Open the [live app](https://sajilotrip.onrender.com), create an account with
    your phone number, and tap **Start a trip**.
 2. Go to the **Trip** tab: add your friends, the route, stays and phone numbers.
 3. Tap the share icon and send the invite link to the group.
@@ -114,7 +114,7 @@ goes to the first people in the list.
 
 | Part | Tech | Hosted on |
 |---|---|---|
-| Frontend (`web/`) | React 18, TypeScript, Vite, vite-plugin-pwa, Vaul, Sonner | Netlify |
+| Frontend (`web/`) | React 18, TypeScript, Vite, vite-plugin-pwa, Vaul, Sonner | Render (static site) |
 | Backend (`server/`) | Node 22, Express | Render |
 | Database | PostgreSQL | Neon (production), PGlite embedded (local) |
 
@@ -169,25 +169,29 @@ Order matters: each step needs a URL from the one before.
 Create a free project at [neon.tech](https://neon.tech) and copy the
 **pooled** connection string. Tables are created automatically on first start.
 
-**2. Backend — Render**
-New → Blueprint → select this repo. When prompted, set:
+**2. Backend and web app — Render**
+New → Blueprint → select this repo. `render.yaml` creates two services:
 
-| Variable | Value |
-|---|---|
-| `DATABASE_URL` | Neon connection string |
-| `CORS_ORIGIN` | `*` for now; your Netlify URL once you have it |
+- `sajilotrip-api` — the API. When prompted, set:
+
+  | Variable | Value |
+  |---|---|
+  | `DATABASE_URL` | Neon connection string |
+  | `CORS_ORIGIN` | the web app URL, e.g. `https://sajilotrip.onrender.com` |
+
+- `sajilotrip` — the PWA as a free static site. Its `VITE_API_URL` is set in
+  `render.yaml`; if your API has a different URL, change it there.
 
 Check `https://<your-api>.onrender.com/api/health` returns `{"ok":true}`.
-Free Render services sleep after 15 minutes idle; a cron job hitting
-`/api/health` every 10 minutes keeps it awake.
+Free Render web services sleep after 15 minutes idle; a cron job hitting
+`/api/health` every 5–10 minutes (with header `Accept: application/json`)
+keeps it awake. Static sites never sleep.
 
-**3. Frontend — Netlify**
-Import this repo (settings come from `netlify.toml`) and add the environment
-variable `VITE_API_URL` = your Render URL, without a trailing slash. Deploy,
-then put the Netlify URL into `CORS_ORIGIN` on Render.
+`VITE_API_URL` is baked in at build time; after changing it, redeploy the
+static site with *Clear build cache & deploy*.
 
-`VITE_API_URL` is baked in at build time — after changing it, use
-*Clear cache and deploy site*.
+The repo still contains `netlify.toml` if you prefer Netlify for the web app,
+but Netlify's free plan limits production deploys per month.
 
 ## Data isolation
 
