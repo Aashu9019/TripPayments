@@ -51,6 +51,10 @@ fewest payments needed to settle everyone.
 - The leader can set a photo for anyone they added (the person's own
   profile photo takes over once they set one)
 - Every member's number is one tap away (Call / WhatsApp)
+- Change your own password from Your profile; the trip leader can set a
+  temporary password for a member who forgot theirs (only when every trip
+  that person is on is led or co-led by them), and the member must choose
+  their own on next sign-in
 - Profile photo and name, set once and shown on every trip (photos are
   cropped and compressed on the phone before upload)
 - Roles, Clash of Clans style:
@@ -214,8 +218,8 @@ session token, sent as `Authorization: Bearer <token>`. Full reference in
   convert them.
 - No SMS verification of phone numbers (it costs money per message); the
   number is the login, protected by a password.
-- No password reset yet; the leader can free your seat so you can rejoin
-  from a new account.
+- No self-service password reset by SMS; the trip leader can set a temporary
+  password instead.
 
 ## License
 

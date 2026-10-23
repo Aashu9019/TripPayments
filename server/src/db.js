@@ -169,6 +169,7 @@ async function migrate() {
     )`,
     `ALTER TABLE members ADD COLUMN IF NOT EXISTS user_id TEXT REFERENCES users(id) ON DELETE SET NULL`,
     `ALTER TABLE users DROP COLUMN IF EXISTS is_admin`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT false`,
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_id TEXT`,
     `CREATE TABLE IF NOT EXISTS avatars (
       id TEXT PRIMARY KEY,

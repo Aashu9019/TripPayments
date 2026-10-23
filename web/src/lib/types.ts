@@ -86,6 +86,8 @@ export interface User {
   phone: string;
   name: string;
   avatarId?: string | null;
+  /** Signed in with a temporary password from the trip leader. */
+  mustChangePassword?: boolean;
 }
 
 /** A trip in the signed-in user's list, with their own balance. */

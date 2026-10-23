@@ -109,7 +109,7 @@ async function currentUser(req) {
   const token = header.startsWith('Bearer ') ? header.slice(7) : '';
   if (!token) return null;
   const { rows } = await sys(
-    'SELECT u.id, u.phone, u.name, u.avatar_id FROM auth_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1',
+    'SELECT u.id, u.phone, u.name, u.avatar_id, u.must_change_password FROM auth_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1',
     [hash(token)],
   );
   return rows[0] ?? null;
@@ -258,7 +258,7 @@ app.post(
     const user = rows[0];
     if (!user || !(await checkPassword(password, user.pass_hash))) throw new HttpError(401, 'Wrong phone number or password');
     await linkSeatsByPhone(query, user.id, user.phone);
-    res.json({ token: await newSession(user.id), user: { id: user.id, phone: user.phone, name: user.name, avatarId: user.avatar_id } });
+    res.json({ token: await newSession(user.id), user: { id: user.id, phone: user.phone, name: user.name, avatarId: user.avatar_id, mustChangePassword: user.must_change_password } });
   }),
 );
 
@@ -276,8 +276,27 @@ app.get(
   '/api/auth/me',
   wrap(async (req, res) => {
     useSystem();
-    const { avatar_id, ...user } = await requireUser(req);
-    res.json({ user: { ...user, avatarId: avatar_id } });
+    const { avatar_id, must_change_password, ...user } = await requireUser(req);
+    res.json({ user: { ...user, avatarId: avatar_id, mustChangePassword: must_change_password } });
+  }),
+);
+
+// Change your own password. Other devices are signed out; this one stays in.
+app.put(
+  '/api/me/password',
+  wrap(async (req, res) => {
+    useSystem();
+    const user = await requireUser(req);
+    const current = typeof req.body.current === 'string' ? req.body.current : '';
+    const next = typeof req.body.next === 'string' ? req.body.next : '';
+    if (next.length < 6) throw bad('New password needs at least 6 characters');
+    throttle(`${req.ip}:pw:${user.id}`);
+    const { rows } = await query('SELECT pass_hash FROM users WHERE id = $1', [user.id]);
+    if (!(await checkPassword(current, rows[0].pass_hash))) throw new HttpError(401, 'Current password is wrong');
+    const header = req.get('authorization') ?? '';
+    await query('UPDATE users SET pass_hash = $1, must_change_password = false WHERE id = $2', [await hashPassword(next), user.id]);
+    await query('DELETE FROM auth_sessions WHERE user_id = $1 AND token_hash <> $2', [user.id, hash(header.slice(7))]);
+    res.json({ ok: true });
   }),
 );
 
@@ -552,6 +571,41 @@ app.delete(
     }
     await bump(query, trip.id);
     res.json({ ok: true, kept: rows.length > 0 });
+  }),
+);
+
+// Trip leader sets a temporary password for a member who forgot theirs.
+// Accounts are shared across trips, so this is only allowed when every trip
+// that person is on is led or co-led by the caller: no way into other groups.
+// They are signed out everywhere and must pick their own password next time.
+app.put(
+  '/api/trips/:code/members/:id/password',
+  wrap(async (req, res) => {
+    const trip = await loadTrip(req.params.code, req);
+    const me = await auth(req, trip, { owner: true });
+    const { rows } = await query('SELECT id, name, user_id FROM members WHERE id = $1 AND trip_id = $2', [req.params.id, trip.id]);
+    const m = rows[0];
+    if (!m) throw new HttpError(404, 'Member not found');
+    if (m.id === me.id) throw bad('Change your own password from Your profile');
+    if (!m.user_id) throw bad(`${m.name} has not made an account yet`);
+    const password = typeof req.body.password === 'string' ? req.body.password : '';
+    if (password.length < 6) throw bad('Password needs at least 6 characters');
+    const { rows: elsewhere } = await sys(
+      `SELECT 1 FROM members t
+       WHERE t.user_id = $1 AND t.left_at IS NULL
+         AND NOT EXISTS (
+           SELECT 1 FROM members l
+           WHERE l.trip_id = t.trip_id AND l.user_id = $2 AND l.role IN ('leader', 'coleader') AND l.left_at IS NULL
+         )
+       LIMIT 1`,
+      [m.user_id, me.user_id],
+    );
+    if (elsewhere.length) {
+      throw new HttpError(409, `${m.name} is also on trips you don't lead, so only they can change their password`);
+    }
+    await sys('UPDATE users SET pass_hash = $1, must_change_password = true WHERE id = $2', [await hashPassword(password), m.user_id]);
+    await sys('DELETE FROM auth_sessions WHERE user_id = $1', [m.user_id]);
+    res.json({ ok: true });
   }),
 );
 

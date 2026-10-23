@@ -1351,3 +1351,9 @@
   z-index: 1;
   box-shadow: 0 0 0 2px var(--paper);
 }
+
+.temp-pw {
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--paper-2);
+}

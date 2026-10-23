@@ -6,6 +6,7 @@ import { useAuth } from '../lib/auth-context';
 import { Avatar, Sheet } from './ui';
 import { formatPhone } from './ContactButtons';
 import { useCalendar } from './DateField';
+import { PasswordForm } from './PasswordForm';
 import { setCalendar } from '../lib/dates';
 
 const SIZE = 256;
@@ -39,6 +40,7 @@ export function ProfileSheet({ open, onOpenChange, onChanged }: { open: boolean;
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const cal = useCalendar();
+  const [pwOpen, setPwOpen] = useState(false);
 
   useEffect(() => {
     if (open && user) setName(user.name);
@@ -127,6 +129,16 @@ export function ProfileSheet({ open, onOpenChange, onChanged }: { open: boolean;
         <input className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={40} />
       </label>
       <p className="hint">{formatPhone(user.phone)} · your friends see this name and photo on every trip.</p>
+      <div className="field-label">Password</div>
+      {pwOpen ? (
+        <PasswordForm onDone={() => setPwOpen(false)} />
+      ) : (
+        <div className="pad" style={{ marginBottom: 16 }}>
+          <button className="btn ghost block" onClick={() => setPwOpen(true)}>
+            Change password
+          </button>
+        </div>
+      )}
       <div className="field-label">Dates</div>
       <div className="segmented" role="radiogroup" aria-label="Calendar">
         <button role="radio" aria-checked={cal === 'bs'} onClick={() => setCalendar('bs')}>

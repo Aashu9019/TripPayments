@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { Navigate, useLocation } from 'react-router-dom';
 import { api, auth, setSignedOutHandler } from './api';
 import type { User } from './types';
+import { ForcePasswordChange } from '../components/PasswordForm';
 
 interface AuthCtx {
   user: User | null;
@@ -63,5 +64,6 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const location = useLocation();
   if (!user) return <Navigate to={`/login?next=${encodeURIComponent(location.pathname + location.search)}`} replace />;
+  if (user.mustChangePassword) return <ForcePasswordChange />;
   return <>{children}</>;
 }

@@ -13,6 +13,8 @@ normalised to `+<country><number>`; bare 10-digit Nepali mobiles get +977.
 | GET | `/auth/me` | signed in | `{user}` |
 | GET | `/me/trips` | signed in | your trips with your balance in each |
 | PATCH | `/me` | signed in | `name` (also renames your trip seats) |
+| PUT | `/me/password` | signed in | `current, next`; signs out your other devices |
+| PUT | `/trips/:code/members/:id/password` | leader | `password` (temporary). Only if every trip that person is on is led/co-led by you; they are signed out and must change it |
 | PUT | `/me/avatar` | signed in | `image` as a JPEG/WebP/PNG data URL, max 200 KB → `{avatarId}` |
 | DELETE | `/me/avatar` | signed in | removes your photo |
 | PUT | `/trips/:code/members/:id/avatar` | leader | `image` data URL, or `null` to remove; shown until the person sets their own |

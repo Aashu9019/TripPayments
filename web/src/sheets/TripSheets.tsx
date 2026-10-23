@@ -136,11 +136,13 @@ export function MemberSheet({
   // Photo the leader picked: a data URL waiting to upload, or null to remove.
   const [photo, setPhoto] = useState<string | null | undefined>(undefined);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [tempPw, setTempPw] = useState<string | null>(null);
   useEffect(() => {
     if (open) {
       setName(member?.name ?? '');
       setPhone(member?.phone ?? '');
       setPhoto(undefined);
+      setTempPw(null);
     }
   }, [open, member]);
   const self = member?.id === me?.id;
@@ -246,6 +248,36 @@ export function MemberSheet({
             <button className="btn ghost" disabled={busy} onClick={() => run(() => api.updateMember(code, member.id, { release: true }), 'Seat freed. They can join again.')}>
               Unlink their account
             </button>
+          )}
+          {member.claimed && isLeader && (
+            tempPw === null ? (
+              <button className="btn ghost" disabled={busy} onClick={() => setTempPw('')}>
+                Set a new password
+              </button>
+            ) : (
+              <div className="temp-pw">
+                <label className="field" style={{ padding: 0, margin: 0 }}>
+                  <span>Temporary password for {member.name.split(' ')[0]}</span>
+                  <input className="input" type="text" autoComplete="off" value={tempPw} onChange={(e) => setTempPw(e.target.value)} placeholder="At least 6 characters" />
+                </label>
+                <p className="hint" style={{ padding: 0, margin: '6px 0 10px' }}>
+                  Tell them this password. They’ll be signed out everywhere and asked to choose their own when they next sign in.
+                </p>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn ghost" style={{ flex: 1 }} onClick={() => setTempPw(null)}>
+                    Cancel
+                  </button>
+                  <button
+                    className="btn"
+                    style={{ flex: 1 }}
+                    disabled={busy || tempPw.length < 6}
+                    onClick={() => run(() => api.setMemberPassword(code, member.id, tempPw), `Password set. Tell ${member.name.split(' ')[0]} the new one.`)}
+                  >
+                    Set password
+                  </button>
+                </div>
+              </div>
+            )
           )}
           {!member.left_at && member.role === 'member' && (
             <button

@@ -83,6 +83,9 @@ export const api = {
   setAvatar: (image: string) => request<{ avatarId: string }>('PUT', '/me/avatar', { image }),
   removeAvatar: () => request('DELETE', '/me/avatar'),
   updateMe: (body: { name: string }) => request('PATCH', '/me', body),
+  changePassword: (body: { current: string; next: string }) => request('PUT', '/me/password', body),
+  setMemberPassword: (code: string, id: string, password: string) =>
+    request('PUT', `${t(code)}/members/${id}/password`, { password }),
   signup: (body: { phone: string; name: string; password: string }) => request<AuthRes>('POST', '/auth/signup', body),
   login: (body: { phone: string; password: string }) => request<AuthRes>('POST', '/auth/login', body),
   logout: () => request('POST', '/auth/logout', {}),
